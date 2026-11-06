@@ -1,0 +1,1617 @@
+<title>BIMORA</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: aplicação de tela única — trilho de módulos à esquerda, área de trabalho à direita; o visualizador 3D é um único canvas que muda de lugar entre Visualizador e Revisão */
+:root{
+  --bg:#eceff4; --surface:#ffffff; --surface-2:#f5f7fa; --ink:#151b2c; --muted:#5a6377; --line:#d8dde6;
+  --brand:#1f2d6b; --brand-ink:#ffffff; --accent:#e2701f; --accent-soft:#fbe7d6; --viewer:#dde3ec; --focus:#2f74d0;
+  --p1:#d23a32; --p2:#e07a1f; --p3:#c99a00; --p4:#2f9a52; --info:#2f74d0; --fake:#4d576b; --ok:#2f9a52;
+  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-cond:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f131b; --surface:#161b25; --surface-2:#1c2230; --ink:#e5e8ef; --muted:#97a1b4; --line:#2b3345;
+  --brand:#9aabff; --brand-ink:#0f131b; --accent:#f08c45; --accent-soft:#3a2617; --viewer:#1a1f2b; --focus:#6ea5f0;
+  --p1:#f0625a; --p2:#f39a4c; --p3:#e2bd3a; --p4:#5cc27f; --info:#6ea5f0; --fake:#8a94a8; --ok:#5cc27f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f131b; --surface:#161b25; --surface-2:#1c2230; --ink:#e5e8ef; --muted:#97a1b4; --line:#2b3345;
+  --brand:#9aabff; --brand-ink:#0f131b; --accent:#f08c45; --accent-soft:#3a2617; --viewer:#1a1f2b; --focus:#6ea5f0;
+  --p1:#f0625a; --p2:#f39a4c; --p3:#e2bd3a; --p4:#5cc27f; --info:#6ea5f0; --fake:#8a94a8; --ok:#5cc27f; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);overflow:hidden}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.mono{font-family:var(--font-mono);font-size:12px}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+.app{display:grid;grid-template-columns:200px 1fr;grid-template-rows:52px 1fr;height:100%;
+  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.top{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding-inline:16px;background:var(--surface);border-bottom:1px solid var(--line);min-width:0}
+.logo{display:flex;align-items:center;gap:8px;font:700 19px/1 var(--font-cond);letter-spacing:.06em;color:var(--brand)}
+.logo svg{width:22px;height:22px}
+.projsel{display:flex;align-items:center;gap:8px;min-width:0}
+.projsel select{max-width:340px;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2)}
+.top .grow{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font-size:12.5px;font-weight:500;border:1px solid var(--line);background:var(--surface-2);cursor:pointer;white-space:nowrap}
+.pill.warn{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+
+nav.rail{background:var(--surface);border-right:1px solid var(--line);padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow:auto}
+nav.rail button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:6px;background:none;text-align:left;cursor:pointer;color:var(--muted);font-weight:500}
+nav.rail button svg{width:18px;height:18px;flex:none}
+nav.rail button:hover{background:var(--surface-2);color:var(--ink)}
+nav.rail button[aria-current="page"]{background:var(--brand);color:var(--brand-ink)}
+nav.rail .step{margin-left:auto;font:500 11px var(--font-mono);opacity:.7}
+nav.rail .sep{height:1px;background:var(--line);margin:8px 4px}
+nav.rail .badge{margin-left:auto;background:var(--accent);color:#fff;border-radius:999px;font-size:11px;padding:1px 7px;font-weight:600}
+
+main{overflow:auto;min-width:0;position:relative}
+.view{padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1280px}
+.view.full{max-width:none;height:100%;padding:0;display:grid}
+h1{font:600 22px/1.2 var(--font-cond);margin:0 0 4px;text-wrap:balance}
+h2{font:600 15px/1.3 var(--font-cond);margin:0;letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
+h3{font:600 15px/1.3 var(--font);margin:0}
+.lede{color:var(--muted);margin:0 0 18px;max-width:72ch}
+.stack{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.panel > h2{margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.ghost{border-color:transparent;background:none}
+.btn.small{padding:4px 8px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input[type=text],input[type=email],input[type=number],select,textarea{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);min-width:0}
+textarea{width:100%;resize:vertical}
+label.fld{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);min-width:0}
+label.fld input,label.fld textarea,label.fld select{color:var(--ink);font-size:14px}
+
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font:600 11.5px var(--font);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--surface-2)}
+td input[type=text],td input[type=email],td input[type=number],td select{width:100%}
+td.tight{width:1%;white-space:nowrap}
+
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:4px;font:600 11.5px var(--font);white-space:nowrap;color:#fff;background:var(--fake)}
+.chip.P1{background:var(--p1)} .chip.P2{background:var(--p2)} .chip.P3{background:var(--p3);color:#1d1a10} .chip.P4{background:var(--p4)} .chip.INFO{background:var(--info)} .chip.FALSO{background:var(--fake)}
+.chip.outline{background:none;color:var(--muted);border:1px solid var(--line);font-weight:500}
+.chip.sug{background:none;border:1px dashed var(--accent);color:var(--ink);font-weight:500}
+.chip.ok{background:none;border:1px solid var(--ok);color:var(--ok);font-weight:500}
+.sevbar{display:flex;height:10px;border-radius:3px;overflow:hidden;background:var(--surface-2)}
+.sevbar span{display:block;height:100%}
+
+.alert{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent-soft)}
+.alert b{font-weight:600}
+.alert .grow{flex:1;min-width:200px}
+.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
+
+.drop{border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;cursor:pointer;background:var(--surface-2)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.prog{height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden;min-width:80px}
+.prog i{display:block;height:100%;background:var(--accent);transition:width .2s}
+
+/* Visualizador */
+.vlayout{display:grid;grid-template-columns:260px 1fr 340px;height:100%;min-height:0}
+.vside{background:var(--surface);overflow:auto;min-width:0;min-height:0}
+.vside.left{border-right:1px solid var(--line)}
+.vside.right{border-left:1px solid var(--line)}
+.vside .hd{position:sticky;top:0;background:var(--surface);padding:12px 14px 8px;border-bottom:1px solid var(--line);z-index:1}
+.slot{position:relative;min-width:0;min-height:0;background:var(--viewer)}
+#viewer{position:absolute;inset:0}
+#viewer canvas{display:block;width:100%;height:100%}
+.vtools{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:2}
+.vtools .btn{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.vtools .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.vstatus{position:absolute;left:10px;bottom:10px;font-size:12px;color:var(--muted);background:var(--surface);padding:4px 8px;border-radius:4px;z-index:2;max-width:calc(100% - 20px)}
+.vmsg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--muted);z-index:1;pointer-events:none}
+.legend{position:absolute;right:10px;bottom:10px;background:var(--surface);border-radius:6px;padding:6px 10px;font-size:12px;display:flex;flex-direction:column;gap:3px;z-index:2;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+.tree{list-style:none;margin:0;padding:6px 6px 16px}
+.tree ul{list-style:none;margin:0;padding-left:14px}
+.tree .node{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:13px;min-width:0}
+.tree .node:hover{background:var(--surface-2)}
+.tree .node.sel{background:var(--accent-soft)}
+.tree .node .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree .node .ct{font:500 11px var(--font-mono);color:var(--muted)}
+.tree .model > .node{font-weight:600}
+.tree input[type=checkbox]{margin:0}
+.tree .caret{width:12px;text-align:center;color:var(--muted);font-size:10px}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding-inline:14px}
+.tabs button{border:0;background:none;padding:8px 10px;cursor:pointer;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.props{width:100%;font-size:12.5px}
+.props td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
+.props td:first-child{color:var(--muted);width:42%}
+.props tr.grp td{background:var(--surface-2);font-weight:600;color:var(--ink);cursor:pointer}
+.props tr.hl td{background:var(--accent-soft)}
+.props .fx{opacity:0;border:0;background:none;cursor:pointer;color:var(--muted);padding:0 2px;font-size:12px}
+.props tr:hover .fx{opacity:1}
+details.pset{border-bottom:1px solid var(--line)}
+details.pset summary{padding:7px 14px;cursor:pointer;font-weight:600;font-size:13px;background:var(--surface-2);list-style-position:inside}
+details.pset summary .muted{font-weight:400;font-size:12px}
+
+/* Clashes */
+.lvl{border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden}
+.lvl > summary{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;list-style:none;flex-wrap:wrap}
+.lvl > summary::-webkit-details-marker{display:none}
+.lvl > summary .name{font:600 16px var(--font-cond);text-transform:uppercase;letter-spacing:.04em;min-width:140px}
+.lvl > summary .count{font:600 13px var(--font-mono);background:var(--surface-2);border-radius:999px;padding:2px 10px}
+.lvl > summary .chips{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 12px;cursor:pointer;font-weight:500;color:var(--muted);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink)}
+
+/* Revisão */
+.rlayout{display:grid;grid-template-columns:280px 1fr 380px;height:100%;min-height:0}
+.qitem{display:flex;gap:8px;align-items:flex-start;padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.qitem:hover{background:var(--surface-2)}
+.qitem.sel{background:var(--accent-soft)}
+.qitem .t{font-weight:600;font-size:13px}
+.qitem .s{font-size:12px;color:var(--muted)}
+.qgroup{padding:10px 14px 4px;font:600 12px var(--font-cond);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.card{padding:14px;display:flex;flex-direction:column;gap:12px}
+.elbox{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12.5px;display:flex;flex-direction:column;gap:2px}
+.elbox .hdr{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none}
+.reason{font-size:12.5px;padding:8px 10px;border-left:3px solid var(--accent);background:var(--surface-2);border-radius:0 6px 6px 0}
+.kv{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:13px;align-items:center}
+.kv > span:nth-child(odd){color:var(--muted);font-size:12.5px}
+.snaps{display:flex;gap:6px;flex-wrap:wrap}
+.snaps img{width:96px;height:64px;object-fit:cover;border-radius:4px;border:1px solid var(--line)}
+.cmt{font-size:12.5px;border-left:2px solid var(--line);padding:2px 0 2px 8px}
+kbd{font:500 11px var(--font-mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;background:var(--surface-2)}
+
+pre.xml{margin:0;padding:12px;background:var(--surface-2);border-radius:6px;overflow:auto;font:12px/1.5 var(--font-mono);max-height:420px;white-space:pre}
+
+.toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:6px;font-size:13px;z-index:50;max-width:calc(100% - 32px);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+
+@media (max-width:1100px){
+  .vlayout{grid-template-columns:220px 1fr}
+  .vlayout .vside.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);max-height:40vh}
+  .rlayout{grid-template-columns:240px 1fr}
+  .rlayout .vside.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}
+  .view.full{overflow:auto}
+  .vlayout,.rlayout{height:auto;grid-template-rows:minmax(420px,60vh) auto}
+}
+@media (max-width:720px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}
+  .top{flex-wrap:wrap;padding-block:8px;gap:8px 12px}
+  .projsel select{max-width:60vw}
+  nav.rail{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px}
+  nav.rail button{width:auto;white-space:nowrap}
+  nav.rail .step,nav.rail .sep{display:none}
+  .vlayout,.rlayout{grid-template-columns:1fr;grid-template-rows:auto minmax(360px,55vh) auto}
+  .vlayout .vside.left,.rlayout .vside.left{max-height:32vh;border-right:0;border-bottom:1px solid var(--line)}
+  .kv{grid-template-columns:96px 1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="logo" aria-label="BIMORA">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg>
+      BIMORA
+    </div>
+    <div class="projsel">
+      <select id="projectSelect" aria-label="Projeto"></select>
+      <button class="btn small" id="newProjectBtn">+ Novo projeto</button>
+    </div>
+    <div class="grow"></div>
+    <button class="pill" id="reviewPill" hidden></button>
+  </header>
+  <nav class="rail" id="rail" aria-label="Módulos"></nav>
+  <main id="main"></main>
+</div>
+
+<!-- visualizador único, reposicionado entre as telas -->
+<div id="viewer" hidden>
+  <div class="vtools">
+    <button class="btn small" data-act="fit" title="Ajustar vista">Ajustar vista</button>
+    <button class="btn small" data-act="showall" title="Mostrar tudo">Mostrar tudo</button>
+    <button class="btn small" data-act="isolate" title="Isolar seleção">Isolar seleção</button>
+    <button class="btn small" data-act="snap" title="Capturar imagem da vista">Snapshot</button>
+  </div>
+  <div class="legend" id="vlegend" hidden></div>
+  <div class="vmsg" id="vmsg"></div>
+  <div class="vstatus" id="vstatus">Carregando motor IFC…</div>
+</div>
+<input type="file" id="fileInput" accept=".ifc" multiple hidden>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script type="module">
+/* ===================================================================== */
+/*  Dados de referência (Manual Corporativo de Clash Detection + BCF)     */
+/* ===================================================================== */
+const CLASSES = {
+  P1:{label:"P1 – Crítico", bcf:"P1 - Crítico", prazo:"Imediato", aceite:"Não pode permanecer aberto"},
+  P2:{label:"P2 – Alto", bcf:"P2 - Alto", prazo:"Próxima rodada", aceite:"Resolver antes da emissão"},
+  P3:{label:"P3 – Médio", bcf:"P3 - Médio", prazo:"Até fechamento da etapa", aceite:"Pode permanecer temporariamente aberto"},
+  P4:{label:"P4 – Baixo", bcf:"P4 - Baixo", prazo:"Antes da obra", aceite:"Pode ser agrupado"},
+  INFO:{label:"INFO", bcf:"INFO - Informativo", prazo:"—", aceite:"Sem ação corretiva obrigatória"},
+  FALSO:{label:"Falso clash", bcf:null, prazo:"—", aceite:"Separado; não vira issue"},
+};
+const CLS_ORDER = ["P1","P2","P3","P4","INFO","FALSO"];
+
+const GROUPS = {EST:"Estrutura",ARQ:"Arquitetura",SAN:"Hidrossanitário",HVAC:"HVAC",ELE:"Elétrica",PCI:"Incêndio",FORRO:"Forro",MEP:"MEP",EQUIP:"Equipamentos"};
+const CODE_INFO = { // código no nome do arquivo → disciplina
+  EST:["Estrutura","EST"], ARQ:["Arquitetura","ARQ"], SAN:["Hidrossanitário","SAN"], HID:["Hidráulica","SAN"],
+  PCI:["Prevenção e combate a incêndio","PCI"], PSI:["Piscina","SAN"], ELE:["Elétrica","ELE"], SCE:["Cabeamento estruturado","ELE"],
+  SPD:["SPDA","ELE"], SUB:["Subestação","ELE"], CLI:["Climatização","HVAC"], CON:["Climatização","HVAC"], HVAC:["HVAC","HVAC"],
+};
+const DEFAULT_TESTS = [
+  [1,"EST","EST",0,"hard","Autodesk + BEP Penn State","Consistência estrutural"],
+  [2,"EST","ARQ",5,"hard","Penn State BEP","Compatibilidade geométrica"],
+  [3,"EST","SAN",5,"hard","Autodesk Practice","Perfurações críticas"],
+  [4,"EST","HVAC",5,"hard","NBIMS/Autodesk","Interferências críticas"],
+  [5,"EST","ELE",5,"hard","NBIMS/Autodesk","Passagens estruturais"],
+  [6,"EST","PCI",5,"hard","NBIMS","Sistema essencial"],
+  [7,"HVAC","HVAC",10,"hard","Autodesk","Coordenação interna"],
+  [8,"SAN","SAN",10,"hard","Autodesk","Coordenação interna"],
+  [9,"ELE","ELE",10,"hard","Autodesk","Coordenação interna"],
+  [10,"HVAC","SAN",10,"hard","Clash Matrix Practice","Congestionamento MEP"],
+  [11,"HVAC","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [12,"SAN","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [13,"PCI","HVAC",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [14,"PCI","SAN",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [15,"PCI","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [16,"ARQ","HVAC",10,"hard","NBIMS + BEP","Forros e shafts"],
+  [17,"ARQ","SAN",10,"hard","NBIMS + BEP","Áreas molhadas"],
+  [18,"ARQ","ELE",10,"hard","NBIMS + BEP","Equipamentos e luminárias"],
+  [19,"FORRO","MEP",25,"clearance","Autodesk Clearance Clash","Espaço de instalação"],
+  [20,"EQUIP","MEP",30,"clearance","Autodesk Clearance Clash","Manutenção"],
+  [21,"EQUIP","ARQ",30,"clearance","Autodesk Clearance Clash","Operação"],
+].map(([ordem,a,b,tol,kind,fonte,just])=>({id:"t"+ordem,ordem,a,b,tol,kind,fonte,just,on:true}));
+
+const DEFAULT_ENTITY_NAMES = {
+  IFCPIPESEGMENT:"Segmento de tubulação", IFCPIPEFITTING:"Conexão de tubulação", IFCDUCTSEGMENT:"Segmento de duto", IFCDUCTFITTING:"Conexão de duto",
+  IFCCABLECARRIERSEGMENT:"Segmento de eletrocalha", IFCCABLECARRIERFITTING:"Conexão de eletrocalha", IFCCABLESEGMENT:"Segmento de cabo", IFCCABLEFITTING:"Conexão de cabo",
+  IFCFLOWSEGMENT:"Segmento de fluxo", IFCFLOWFITTING:"Conexão de fluxo", IFCFLOWTERMINAL:"Terminal de fluxo", IFCFLOWCONTROLLER:"Controlador de fluxo",
+  IFCVALVE:"Válvula/registro", IFCSANITARYTERMINAL:"Aparelho sanitário", IFCWASTETERMINAL:"Terminal de esgoto", IFCLIGHTFIXTURE:"Luminária", IFCOUTLET:"Tomada",
+  IFCSWITCHINGDEVICE:"Interruptor", IFCELECTRICDISTRIBUTIONBOARD:"Quadro de distribuição", IFCJUNCTIONBOX:"Caixa de passagem", IFCFIRESUPPRESSIONTERMINAL:"Terminal de combate a incêndio",
+  IFCALARM:"Alarme", IFCSENSOR:"Sensor", IFCTANK:"Reservatório", IFCPUMP:"Bomba", IFCAIRTERMINAL:"Terminal de ar", IFCUNITARYEQUIPMENT:"Equipamento unitário",
+  IFCWALL:"Parede", IFCWALLSTANDARDCASE:"Parede", IFCSLAB:"Laje", IFCBEAM:"Viga", IFCCOLUMN:"Pilar", IFCFOOTING:"Fundação", IFCPILE:"Estaca",
+  IFCSTAIR:"Escada", IFCSTAIRFLIGHT:"Lance de escada", IFCRAMP:"Rampa", IFCRAMPFLIGHT:"Lance de rampa", IFCROOF:"Cobertura", IFCDOOR:"Porta", IFCWINDOW:"Janela",
+  IFCCOVERING:"Revestimento/forro", IFCRAILING:"Guarda-corpo", IFCMEMBER:"Elemento linear", IFCPLATE:"Placa", IFCCURTAINWALL:"Fachada-cortina",
+  IFCBUILDINGELEMENTPROXY:"Elemento genérico", IFCFURNISHINGELEMENT:"Mobiliário", IFCFLOWSTORAGEDEVICE:"Reservatório", IFCFLOWMOVINGDEVICE:"Equipamento de recalque",
+  IFCENERGYCONVERSIONDEVICE:"Equipamento de conversão", IFCFLOWTREATMENTDEVICE:"Dispositivo de tratamento", IFCDISCRETEACCESSORY:"Acessório", IFCREINFORCINGBAR:"Armadura",
+  IFCDISTRIBUTIONCONTROLELEMENT:"Elemento de controle", IFCOPENINGELEMENT:"Abertura", IFCSPACE:"Ambiente",
+};
+const PRETTY_WORDS=/(controller|control|segment|fitting|terminal|device|element|carrier|fixture|board|box|equipment|standard|case|flight|proxy|suppression|distribution|conversion|storage|moving|treatment|unitary|sanitary|light|cable|pipe|duct|air|waste|curtain|building|reinforcing|bar|discrete|accessory|electric|switching|junction|fire|flow|energy|opening|wall|slab|beam|column|covering|railing|member|plate|stair|ramp|roof|door|window|footing|pile|space|annotation|virtual|outlet|valve|sensor|alarm|tank|pump|furnishing|transport|chiller|boiler|transformer|generator|heat|recovery|to|quantity|property|set)/g;
+const cap=w=>w.charAt(0).toUpperCase()+w.slice(1);
+const ifcPretty = c => c ? "Ifc" + cap(c.slice(3).toLowerCase().replace(PRETTY_WORDS,cap)) : "";
+
+const STRUCT_PRIMARY = new Set(["IFCBEAM","IFCCOLUMN","IFCFOOTING","IFCPILE","IFCMEMBER"]);
+const STRUCT_SLAB = new Set(["IFCSLAB","IFCROOF"]);
+const STRUCT_ALL = new Set([...STRUCT_PRIMARY,...STRUCT_SLAB,"IFCWALL","IFCWALLSTANDARDCASE"]);
+const EGRESS = new Set(["IFCSTAIR","IFCSTAIRFLIGHT","IFCRAMP","IFCRAMPFLIGHT"]);
+const FIRE = new Set(["IFCFIRESUPPRESSIONTERMINAL","IFCALARM"]);
+const LINEAR = new Set(["IFCPIPESEGMENT","IFCDUCTSEGMENT","IFCCABLECARRIERSEGMENT","IFCCABLESEGMENT","IFCFLOWSEGMENT"]);
+const FITTING = new Set(["IFCPIPEFITTING","IFCDUCTFITTING","IFCCABLECARRIERFITTING","IFCCABLEFITTING","IFCFLOWFITTING","IFCJUNCTIONBOX"]);
+const EMBEDDED = new Set(["IFCOUTLET","IFCSWITCHINGDEVICE","IFCFLOWTERMINAL","IFCSANITARYTERMINAL","IFCJUNCTIONBOX","IFCELECTRICDISTRIBUTIONBOARD","IFCVALVE","IFCDOOR","IFCWINDOW"]);
+const WALLS = new Set(["IFCWALL","IFCWALLSTANDARDCASE","IFCCURTAINWALL","IFCCOVERING","IFCPLATE"]);
+const EQUIP = new Set(["IFCUNITARYEQUIPMENT","IFCPUMP","IFCTANK","IFCELECTRICDISTRIBUTIONBOARD","IFCFLOWMOVINGDEVICE","IFCENERGYCONVERSIONDEVICE","IFCFLOWSTORAGEDEVICE","IFCCHILLER","IFCBOILER","IFCTRANSFORMER","IFCELECTRICGENERATOR","IFCAIRTOAIRHEATRECOVERY"]);
+const DEFAULT_EXCLUDED = ["IFCOPENINGELEMENT","IFCSPACE","IFCANNOTATION","IFCVIRTUALELEMENT"];
+
+/* Regras de pré-classificação: a primeira que se aplica define a sugestão */
+const RULES = [
+  {id:"r_fit", cls:"FALSO", cond:"Conexão × trecho do mesmo sistema (MEP)", reason:"Sobreposição de conexão com o próprio trecho — interferência de modelagem conhecida.",
+    test:(c,A,B)=>c.kind==="hard" && A.group===B.group && ((FITTING.has(A.cls)&&LINEAR.has(B.cls))||(FITTING.has(B.cls)&&LINEAR.has(A.cls))||(FITTING.has(A.cls)&&FITTING.has(B.cls))) && (!A.system||!B.system||A.system===B.system)},
+  {id:"r_node", cls:"FALSO", cond:"Encontro entre peças estruturais do mesmo modelo", reason:"Nó de pórtico (viga × viga, viga × pilar, laje × viga) no mesmo arquivo de estrutura.",
+    test:(c,A,B)=>A.model===B.model && A.group==="EST" && STRUCT_ALL.has(A.cls) && STRUCT_ALL.has(B.cls)},
+  {id:"r_emb", cls:"FALSO", cond:"Dispositivo embutido em parede/vedação", reason:"Tomada, caixa, quadro ou terminal embutido na vedação, previsto em projeto.",
+    test:(c,A,B)=>(EMBEDDED.has(A.cls)&&WALLS.has(B.cls)&&B.group==="ARQ")||(EMBEDDED.has(B.cls)&&WALLS.has(A.cls)&&A.group==="ARQ")},
+  {id:"r_clear", cls:"INFO", cond:"Teste de folga (clearance) sem interferência física", reason:"Folga menor que a exigida, mas os elementos não se tocam.",
+    test:(c)=>c.kind==="clearance" && c.value>=0},
+  {id:"r_egress", cls:"P1", cond:"Escada/rampa × qualquer elemento", reason:"Interferência em rota de fuga.",
+    test:(c,A,B)=>EGRESS.has(A.cls)||EGRESS.has(B.cls)},
+  {id:"r_fire", cls:"P1", cond:"Terminal de incêndio × qualquer elemento", reason:"Equipamento obstruindo sistema de combate a incêndio.",
+    test:(c,A,B)=>FIRE.has(A.cls)||FIRE.has(B.cls)},
+  {id:"r_beam", cls:"P1", cond:"Viga/pilar × rede MEP com penetração > 50 mm", reason:"Tubulação ou duto atravessando viga/pilar (exemplo P1 do manual).",
+    test:(c,A,B)=>c.kind==="hard" && c.value>50 && ((STRUCT_PRIMARY.has(A.cls)&&isMep(B))||(STRUCT_PRIMARY.has(B.cls)&&isMep(A)))},
+  {id:"r_slab", cls:"P2", cond:"Laje × rede MEP", reason:"Passagem por laje sem furo/shaft previsto — exige redefinição.",
+    test:(c,A,B)=>(STRUCT_SLAB.has(A.cls)&&isMep(B))||(STRUCT_SLAB.has(B.cls)&&isMep(A))},
+  {id:"r_struct", cls:"P2", cond:"Viga/pilar × rede MEP com penetração ≤ 50 mm", reason:"Interferência com estrutura — verificar possibilidade de furo com a estrutura.",
+    test:(c,A,B)=>(STRUCT_PRIMARY.has(A.cls)&&isMep(B))||(STRUCT_PRIMARY.has(B.cls)&&isMep(A))},
+  {id:"r_main", cls:"P2", cond:"Redes principais de disciplinas diferentes", reason:"Conflito entre redes principais — afeta mais de uma disciplina.",
+    test:(c,A,B)=>LINEAR.has(A.cls)&&LINEAR.has(B.cls)&&A.code!==B.code&&mainSize(A)>60&&mainSize(B)>60},
+  {id:"r_arqest", cls:"P4", cond:"Arquitetura × estrutura", reason:"Vedação encostando na estrutura — erro de modelagem sem impacto construtivo.",
+    test:(c,A,B)=>(A.group==="ARQ"&&B.group==="EST")||(A.group==="EST"&&B.group==="ARQ")},
+  {id:"r_marg", cls:"P4", cond:"Penetração até 2× a tolerância", reason:"Interferência marginal, próxima da tolerância estabelecida.",
+    test:(c)=>c.kind==="hard" && c.value<=2*Math.max(c.tol,5)},
+  {id:"r_light", cls:"P3", cond:"Luminária × qualquer elemento", reason:"Reposicionamento de luminária.",
+    test:(c,A,B)=>A.cls==="IFCLIGHTFIXTURE"||B.cls==="IFCLIGHTFIXTURE"},
+  {id:"r_sec", cls:"P3", cond:"Tubulação secundária (≤ 60 mm)", reason:"Ajuste de tubulação secundária — correção pontual.",
+    test:(c,A,B)=>(LINEAR.has(A.cls)&&mainSize(A)<=60)||(LINEAR.has(B.cls)&&mainSize(B)<=60)},
+  {id:"r_wall", cls:"P3", cond:"Rede MEP × alvenaria", reason:"Passagem por alvenaria — furo pontual.",
+    test:(c,A,B)=>(isMep(A)&&WALLS.has(B.cls))||(isMep(B)&&WALLS.has(A.cls))},
+  {id:"r_def", cls:"P3", cond:"Demais casos", reason:"Impacto localizado e controlável.", test:()=>true},
+];
+function isMep(e){return ["SAN","HVAC","ELE","PCI"].includes(e.group)}
+function mainSize(e){const s=[e.size[0],e.size[1],e.size[2]].sort((a,b)=>a-b);return s[1]}
+
+const FLEX_ORDER = ["EST","ARQ","SAN","PSI","PCI","CLI","CON","HVAC","ELE","SUB","SPD","SCE"];
+
+/* ===================================================================== */
+/*  Estado e persistência                                                 */
+/* ===================================================================== */
+const STORE_KEY="bimora.v1";
+const uid=()=> (crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));
+function exampleProject(){
+  return {
+    id:"exemplo", example:true,
+    name:"EDIFÍCIO EDUCACIONAL MODELO (exemplo)",
+    desc:"Projeto de demonstração com modelos IFC gerados pelo BIMORA com o código da disciplina no nome do arquivo (EXEMPLO-EST.ifc, EXEMPLO-SAN.ifc…). A equipe abaixo é fictícia — substitua pelos integrantes reais.",
+    team:[
+      {id:uid(),name:"Coordenador(a) BIM",role:"Coordenador BIM",codes:"",email:"coordenacao@exemplo.com",coord:true},
+      {id:uid(),name:"Ana Lima",role:"Projetista de Elétrica e Cabeamento",codes:"ELE, SCE, SPD, SUB",email:"ana.lima@exemplo.com"},
+      {id:uid(),name:"Bruno Costa",role:"Projetista Hidrossanitário e Incêndio",codes:"SAN, PCI, PSI",email:"bruno.costa@exemplo.com"},
+      {id:uid(),name:"Carla Dias",role:"Projetista Hidrossanitário",codes:"SAN",email:"carla.dias@exemplo.com"},
+      {id:uid(),name:"Diego Rocha",role:"Projetista de Arquitetura",codes:"ARQ",email:"diego.rocha@exemplo.com"},
+      {id:uid(),name:"A definir",role:"Projetista de Estrutura",codes:"EST",email:""},
+      {id:uid(),name:"A definir",role:"Projetista de Climatização",codes:"CLI, CON",email:""},
+    ],
+    ...defaultSettings(),
+    filters:[{id:uid(),on:true,kind:"prop",pset:"Pset_Fase",prop:"Fase",op:"=",value:"Existente",note:"Exemplo: elementos existentes não entram na análise"}],
+  };
+}
+function defaultSettings(){
+  return {
+    tests:DEFAULT_TESTS.map(t=>({...t})),
+    filters:[],
+    excluded:[...DEFAULT_EXCLUDED],
+    rules:Object.fromEntries(RULES.map(r=>[r.id,{on:true,cls:r.cls}])),
+    entityNames:{},
+    flexOrder:[...FLEX_ORDER],
+    decisions:{}, // chave par-de-GUIDs → decisão do coordenador
+    issueSeq:0,
+    created:new Date().toISOString(),
+  };
+}
+let DB;
+try{DB=JSON.parse(localStorage.getItem(STORE_KEY)||"null")}catch(e){DB=null}
+if(!DB||!DB.projects){DB={projects:[exampleProject()],current:"exemplo",view:"projeto"}}
+if(!DB.projects.find(p=>p.id==="exemplo")) DB.projects.unshift(exampleProject());
+for(const p of DB.projects){const d=defaultSettings();for(const k in d) if(p[k]===undefined) p[k]=d[k]}
+let saveT=0;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(STORE_KEY,JSON.stringify(DB))}catch(e){}},250)}
+const proj=()=>DB.projects.find(p=>p.id===DB.current)||DB.projects[0];
+
+/* Estado de sessão (modelos e clashes não são persistidos neste protótipo) */
+const S = {
+  models:{},      // projectId → [model]
+  clashes:{},     // projectId → [clash]
+  lastRun:{},     // projectId → info
+  ui:{clashTab:"real", reviewFilter:"pendentes", reviewSel:null, issueOpen:null, bcfSel:null, propTab:"geral", treeOpen:{}},
+};
+const ELEMS=[]; // todos os elementos carregados (índice global)
+
+/* ===================================================================== */
+/*  Utilitários                                                           */
+/* ===================================================================== */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=(n,d=0)=>Number(n).toLocaleString("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const dateBR=iso=>new Date(iso).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+function toast(msg){const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200)}
+function decIfc(s){
+  if(typeof s!=="string"||s.indexOf("\\")<0) return s;
+  return s.replace(/\\X2\\((?:[0-9A-F]{4})+)\\X0\\/gi,(m,h)=>h.match(/.{4}/g).map(x=>String.fromCharCode(parseInt(x,16))).join(""))
+          .replace(/\\X\\([0-9A-F]{2})/gi,(m,h)=>String.fromCharCode(parseInt(h,16)))
+          .replace(/\\S\\(.)/g,(m,c)=>String.fromCharCode(c.charCodeAt(0)+128))
+          .replace(/\\\\/g,"\\");
+}
+function codeFromFile(name){
+  const up=name.toUpperCase().replace(/\.IFC$/,"");
+  const parts=up.split(/[-_ .]/);
+  for(const p of parts) if(CODE_INFO[p]) return p;
+  return "";
+}
+function entityName(cls){const p=proj();return (p.entityNames&&p.entityNames[cls])||DEFAULT_ENTITY_NAMES[cls]||ifcPretty(cls)}
+function memberFor(code){
+  if(!code) return null;
+  return proj().team.find(m=>(m.codes||"").toUpperCase().split(/[,; ]+/).filter(Boolean).includes(code))||null;
+}
+function coordinator(){return proj().team.find(m=>m.coord)||proj().team[0]||{name:"Coordenador BIM",email:""}}
+
+/* ===================================================================== */
+/*  Motor IFC (web-ifc) e visualizador (three.js)                         */
+/* ===================================================================== */
+let WEBIFC=null, api=null, engineError=null;
+const TYPE_NAME={};
+const vec=v=>{if(!v) return []; if(Array.isArray(v)) return v; const out=[];const n=v.size();for(let i=0;i<n;i++) out.push(v.get(i));return out};
+const val=a=>a==null?null:(typeof a==="object"&&"value" in a)?a.value:a;
+
+async function initEngine(){
+  try{
+    WEBIFC = await import("https://cdn.jsdelivr.net/npm/web-ifc@0.0.39/web-ifc-api.js");
+    for(const [k,v] of Object.entries(WEBIFC)) if(/^IFC[A-Z0-9]+$/.test(k)&&typeof v==="number") TYPE_NAME[v]=k;
+    api = new WEBIFC.IfcAPI();
+    const base = new URL("./", location.href).href;
+    try{api.SetWasmPath(base,true)}catch(e){api.SetWasmPath(base)}
+    await api.Init((path)=> path.endsWith(".wasm") ? base+"web-ifc.wasm" : path);
+    setStatus("Motor IFC pronto.");
+  }catch(e){
+    engineError=e; console.error(e);
+    setStatus("Motor IFC indisponível");
+    setViewerMsg("O motor de leitura IFC não carregou neste navegador ("+esc(e.message||e)+"). A interface continua navegável; recarregue a página para tentar de novo.");
+  }
+}
+
+/* --- cena --- */
+const V={};
+function initViewer(){
+  const el=$("#viewer");
+  V.renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+  V.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  el.prepend(V.renderer.domElement);
+  V.scene=new THREE.Scene();
+  V.camera=new THREE.PerspectiveCamera(60,1,0.05,5000);
+  V.camera.position.set(20,15,20);
+  V.controls=new THREE.OrbitControls(V.camera,V.renderer.domElement);
+  V.controls.enableDamping=true;V.controls.dampingFactor=0.15;
+  V.controls.addEventListener("change",()=>V.dirty=true);
+  V.scene.add(new THREE.HemisphereLight(0xffffff,0x8a8f99,0.85));
+  const d=new THREE.DirectionalLight(0xffffff,0.55);d.position.set(30,50,20);V.scene.add(d);
+  V.root=new THREE.Group();V.scene.add(V.root);
+  V.iso=new THREE.Group();V.scene.add(V.iso);
+  V.hl=new THREE.Group();V.scene.add(V.hl);
+  V.grid=new THREE.GridHelper(200,100,0x8899aa,0xb8c2cf);V.grid.material.transparent=true;V.grid.material.opacity=.35;V.scene.add(V.grid);
+  V.ghost=false;V.sel=[];V.dirty=true;
+  updateViewerTheme();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",updateViewerTheme);
+  new MutationObserver(updateViewerTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+  new ResizeObserver(resizeViewer).observe(el);
+  let down=null;
+  V.renderer.domElement.addEventListener("pointerdown",e=>{down=[e.clientX,e.clientY]});
+  V.renderer.domElement.addEventListener("pointerup",e=>{if(down&&Math.hypot(e.clientX-down[0],e.clientY-down[1])<5) pick(e);down=null});
+  el.querySelector(".vtools").addEventListener("click",e=>{
+    const b=e.target.closest("[data-act]");if(!b) return;
+    const a=b.dataset.act;
+    if(a==="fit") fitView(V.sel.length?boxOf(V.sel):null);
+    if(a==="showall"){if(V.pair){setGhost(false);fitView();return}clearIsolation();selectElements([]);fitView()}
+    if(a==="isolate"){if(V.sel.length) isolate(V.sel); else toast("Selecione um elemento primeiro.")}
+    if(a==="snap") takeSnapshot();
+  });
+  (function loop(){requestAnimationFrame(loop);V.controls.update();if(V.dirty){V.renderer.render(V.scene,V.camera);V.dirty=false}})();
+}
+function updateViewerTheme(){
+  if(!V.scene) return;
+  const c=getComputedStyle(document.documentElement).getPropertyValue("--viewer").trim()||"#dde3ec";
+  V.scene.background=new THREE.Color(c);V.dirty=true;
+}
+function resizeViewer(){
+  const el=$("#viewer");const w=el.clientWidth,h=el.clientHeight;if(!w||!h) return;
+  V.renderer.setSize(w,h,false);V.camera.aspect=w/h;V.camera.updateProjectionMatrix();V.dirty=true;
+}
+function setStatus(t){const s=$("#vstatus");if(s) s.textContent=t}
+function setViewerMsg(t){const m=$("#vmsg");if(m) m.innerHTML=t||""}
+function mountViewer(slot){const v=$("#viewer");v.hidden=false;slot.appendChild(v);resizeViewer()}
+
+/* --- leitura de um modelo --- */
+let GLOBAL_OFFSET=null;
+async function loadIfc(projectId, file, bytes){
+  const list=S.models[projectId]||(S.models[projectId]=[]);
+  const code=codeFromFile(file);
+  const m={id:uid(),projectId,file,code,disc:(CODE_INFO[code]||["A definir"])[0],group:(CODE_INFO[code]||[null,null])[1],
+    status:"lendo",progress:0,elems:[],chunks:[],storeys:[],building:"",visible:true,error:null,size:bytes.byteLength};
+  list.push(m);renderAll();
+  if(engineError||!api){m.status="erro";m.error="Motor IFC indisponível";renderAll();return m}
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    try{const head=new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4000,bytes.byteLength)));const mm=head.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i);m.schema=mm?mm[1]:""}catch(e){}
+    m.stage="abertura do arquivo";
+    const mid=api.OpenModel(new Uint8Array(bytes),{COORDINATE_TO_ORIGIN:false,USE_FAST_BOOLS:true});
+    m.mid=mid;
+    indexModel(m);
+    m.progress=.25;renderModelsProgress();
+    await new Promise(r=>setTimeout(r,0));
+    buildGeometry(m);
+    m.status="pronto";m.progress=1;
+    if(projectId===DB.current){attachModel(m);setViewerMsg("")}
+    renderAll();
+    if(projectId===DB.current && list.filter(x=>x.status==="pronto").length===1) fitView();
+  }catch(e){console.error(e);m.status="erro";m.error=`${e.message||e} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll()}
+  return m;
+}
+
+function indexModel(m){
+  const mid=m.mid,T=WEBIFC;
+  m.skipped=m.skipped||{};
+  const skip=(what,e)=>{m.skipped[what]=(m.skipped[what]||0)+1;if(m.skipped[what]===1) console.warn("BIMORA: "+what+" ignorado",e)};
+  const ids=code=>{if(code==null) return [];try{return vec(api.GetLineIDsWithType(mid,code))}catch(e){skip("tipo "+code,e);return []}};
+  const line=id=>api.GetLine(mid,id,false);
+  const each=(code,label,fn)=>{for(const id of ids(code)){try{const l=line(id);if(l) fn(l,id)}catch(e){skip(label,e)}}};
+  const refs=a=>Array.isArray(a)?a:(a==null?[]:[a]);
+  m.containedIn={};m.aggParent={};m.psetsOf={};m.typeOf={};m.systemOf={};m.layerOfRep={};m.storeyInfo={};
+  m.stage="relações espaciais";
+  each(T.IFCRELCONTAINEDINSPATIALSTRUCTURE,"IfcRelContainedInSpatialStructure",l=>{const st=val(l.RelatingStructure);for(const r of refs(l.RelatedElements)) m.containedIn[val(r)]=st});
+  each(T.IFCRELAGGREGATES,"IfcRelAggregates",l=>{const p=val(l.RelatingObject);for(const r of refs(l.RelatedObjects)) m.aggParent[val(r)]=p});
+  m.stage="PropertySets";
+  each(T.IFCRELDEFINESBYPROPERTIES,"IfcRelDefinesByProperties",l=>{const pd=val(l.RelatingPropertyDefinition);for(const r of refs(l.RelatedObjects)){const k=val(r);(m.psetsOf[k]||(m.psetsOf[k]=[])).push(pd)}});
+  m.stage="tipos";
+  each(T.IFCRELDEFINESBYTYPE,"IfcRelDefinesByType",l=>{const t=val(l.RelatingType);for(const r of refs(l.RelatedObjects)) m.typeOf[val(r)]=t});
+  m.stage="sistemas";
+  each(T.IFCRELASSIGNSTOGROUP,"IfcRelAssignsToGroup",l=>{
+    const g=val(l.RelatingGroup);let gl;try{gl=line(g)}catch(e){return}
+    const tn=TYPE_NAME[gl.type]||"";if(!/SYSTEM/.test(tn)) return;
+    for(const r of refs(l.RelatedObjects)) m.systemOf[val(r)]=decIfc(val(gl.Name))||"";
+  });
+  m.stage="layers";
+  each(T.IFCPRESENTATIONLAYERASSIGNMENT,"IfcPresentationLayerAssignment",l=>{const n=decIfc(val(l.Name));for(const r of refs(l.AssignedItems)) m.layerOfRep[val(r)]=n});
+  m.stage="pavimentos";
+  each(T.IFCBUILDINGSTOREY,"IfcBuildingStorey",(l,id)=>{m.storeyInfo[id]={name:decIfc(val(l.Name))||("Pavimento #"+id),elev:Number(val(l.Elevation))||0}});
+  m.storeys=Object.values(m.storeyInfo).sort((a,b)=>a.elev-b.elev);
+  each(T.IFCBUILDING,"IfcBuilding",l=>{if(!m.building) m.building=decIfc(val(l.Name))||""});
+  m.stage="unidades";
+  m.unitScale=1;
+  each(T.IFCSIUNIT,"IfcSIUnit",l=>{if(val(l.UnitType)==="LENGTHUNIT"){m.unitPrefix=val(l.Prefix)||""}});
+}
+function storeyOf(m,eid){
+  let cur=eid;for(let i=0;i<12&&cur!=null;i++){
+    if(m.storeyInfo[cur]) return m.storeyInfo[cur].name;
+    if(m.containedIn[cur]!=null){const s=m.containedIn[cur];if(m.storeyInfo[s]) return m.storeyInfo[s].name;cur=s;continue}
+    cur=m.aggParent[cur];
+  }
+  return "Sem pavimento";
+}
+
+function buildGeometry(m){
+  const mid=m.mid;
+  const perEl=new Map(); // eid → {geoms:[{p,n,i,color}]}
+  let origin=null;
+  let rawMin=[Infinity,Infinity,Infinity],rawMax=[-Infinity,-Infinity,-Infinity];
+  m.stage="geometria";
+  api.StreamAllMeshes(mid,(fm)=>{
+    const eid=fm.expressID;const gs=fm.geometries;const n=gs.size();
+    for(let gi=0;gi<n;gi++){
+     try{
+      const pg=gs.get(gi);
+      const g=api.GetGeometry(mid,pg.geometryExpressID);
+      const vd=api.GetVertexArray(g.GetVertexData(),g.GetVertexDataSize());
+      const id=api.GetIndexArray(g.GetIndexData(),g.GetIndexDataSize());
+      const t=pg.flatTransformation;const nv=vd.length/6;
+      const P=new Float32Array(nv*3),N=new Float32Array(nv*3);
+      for(let k=0;k<nv;k++){
+        const x=vd[k*6],y=vd[k*6+1],z=vd[k*6+2];
+        let X=t[0]*x+t[4]*y+t[8]*z+t[12],Y=t[1]*x+t[5]*y+t[9]*z+t[13],Z=t[2]*x+t[6]*y+t[10]*z+t[14];
+        if(!origin) origin=[X,Y,Z];
+        if(X<rawMin[0])rawMin[0]=X;if(Y<rawMin[1])rawMin[1]=Y;if(Z<rawMin[2])rawMin[2]=Z;
+        if(X>rawMax[0])rawMax[0]=X;if(Y>rawMax[1])rawMax[1]=Y;if(Z>rawMax[2])rawMax[2]=Z;
+        P[k*3]=X-origin[0];P[k*3+1]=Y-origin[1];P[k*3+2]=Z-origin[2];
+        const a=vd[k*6+3],b=vd[k*6+4],c=vd[k*6+5];
+        let nx=t[0]*a+t[4]*b+t[8]*c,ny=t[1]*a+t[5]*b+t[9]*c,nz=t[2]*a+t[6]*b+t[10]*c;const L=Math.hypot(nx,ny,nz)||1;
+        N[k*3]=nx/L;N[k*3+1]=ny/L;N[k*3+2]=nz/L;
+      }
+      const c=pg.color;
+      const rec=perEl.get(eid)||{geoms:[]};rec.geoms.push({p:P,n:N,i:new Uint32Array(id),c:[c.x,c.y,c.z,c.w]});perEl.set(eid,rec);
+      if(g.delete) try{g.delete()}catch(e){}
+     }catch(e){m.skipped=m.skipped||{};m.skipped["geometria"]=(m.skipped["geometria"]||0)+1;if(m.skipped["geometria"]===1) console.warn("BIMORA: geometria ignorada",e)}
+    }
+  });
+  m.stage="elementos";
+  if(!origin){m.empty=true;return}
+  // unidade: se o arquivo está em milímetros e as coordenadas vieram sem conversão, converte para metros
+  const ext=Math.max(rawMax[0]-rawMin[0],rawMax[1]-rawMin[1],rawMax[2]-rawMin[2]);
+  let s=1;
+  if(m.unitPrefix==="MILLI"&&ext>1000) s=0.001; else if(m.unitPrefix==="CENTI"&&ext>1000) s=0.01;
+  m.unitScale=s;m.rawOrigin=origin;
+  const o=[origin[0]*s,origin[1]*s,origin[2]*s];
+  if(!GLOBAL_OFFSET) GLOBAL_OFFSET=o.map(v=>Math.round(v));
+  const cx=o[0]-GLOBAL_OFFSET[0],cy=o[1]-GLOBAL_OFFSET[1],cz=o[2]-GLOBAL_OFFSET[2];
+  m.storeysY=m.storeys.map(st=>({...st,y:st.elev*(m.unitPrefix==="MILLI"?0.001:m.unitPrefix==="CENTI"?0.01:1)-GLOBAL_OFFSET[1]}));
+  const chunks=new Map();
+  for(const [eid,rec] of perEl){
+    let l;try{l=api.GetLine(mid,eid,false)}catch(e){m.skipped["elemento sem atributos"]=(m.skipped["elemento sem atributos"]||0)+1;l={type:null,expressID:eid}}
+    const cls=TYPE_NAME[l.type]||"IFCBUILDINGELEMENTPROXY";
+    let x0=Infinity,y0=Infinity,z0=Infinity,x1=-Infinity,y1=-Infinity,z1=-Infinity;
+    for(const g of rec.geoms){
+      const P=g.p;for(let k=0;k<P.length;k+=3){const X=P[k]=P[k]*s+cx,Y=P[k+1]=P[k+1]*s+cy,Z=P[k+2]=P[k+2]*s+cz;
+        if(X<x0)x0=X;if(Y<y0)y0=Y;if(Z<z0)z0=Z;if(X>x1)x1=X;if(Y>y1)y1=Y;if(Z>z1)z1=Z}
+    }
+    const box=new THREE.Box3(new THREE.Vector3(x0,y0,z0),new THREE.Vector3(x1,y1,z1));
+    const typeId=m.typeOf[eid];let typeName="";
+    if(typeId!=null){try{typeName=decIfc(val(api.GetLine(mid,typeId,false).Name))||""}catch(e){}}
+    const sz=box.getSize(new THREE.Vector3());
+    const el={idx:ELEMS.length,model:m.id,m,eid,cls,guid:val(l.GlobalId)||"",name:decIfc(val(l.Name))||"",objType:decIfc(val(l.ObjectType))||"",
+      tag:decIfc(val(l.Tag))||"",predef:val(l.PredefinedType)||"",typeName,storey:storeyOf(m,eid),system:m.systemOf[eid]||"",
+      group:m.group,code:m.code,box,size:[sz.x*1000,sz.y*1000,sz.z*1000],geoms:rec.geoms,rep:val(l.Representation)};
+    ELEMS.push(el);m.elems.push(el.idx);
+    for(const g of rec.geoms){
+      const key=g.c.map(v=>v.toFixed(3)).join(",");
+      const ch=chunks.get(key)||{c:g.c,parts:[],nv:0,ni:0};ch.parts.push({g,idx:el.idx});ch.nv+=g.p.length/3;ch.ni+=g.i.length;chunks.set(key,ch);
+    }
+  }
+  for(const ch of chunks.values()){
+    const P=new Float32Array(ch.nv*3),N=new Float32Array(ch.nv*3),E=new Float32Array(ch.nv),I=new Uint32Array(ch.ni);
+    let vo=0,io=0;
+    for(const {g,idx} of ch.parts){
+      P.set(g.p,vo*3);N.set(g.n,vo*3);E.fill(idx,vo,vo+g.p.length/3);
+      for(let k=0;k<g.i.length;k++) I[io+k]=g.i[k]+vo;
+      vo+=g.p.length/3;io+=g.i.length;
+    }
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute("position",new THREE.BufferAttribute(P,3));geo.setAttribute("normal",new THREE.BufferAttribute(N,3));
+    geo.setAttribute("eid",new THREE.BufferAttribute(E,1));geo.setIndex(new THREE.BufferAttribute(I,1));geo.computeBoundingSphere();
+    const op=ch.c[3];
+    const mat=new THREE.MeshLambertMaterial({color:new THREE.Color(ch.c[0],ch.c[1],ch.c[2]),transparent:op<1,opacity:op,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+    mat.userData.base={op,transparent:op<1};
+    const mesh=new THREE.Mesh(geo,mat);mesh.userData.model=m.id;
+    m.chunks.push(mesh);
+  }
+}
+function attachModel(m){for(const c of m.chunks){c.visible=m.visible;V.root.add(c)}V.dirty=true}
+function detachAll(){for(const c of [...V.root.children]) V.root.remove(c);clearHL();V.dirty=true}
+function attachProject(pid){detachAll();for(const m of (S.models[pid]||[])) if(m.status==="pronto") attachModel(m);applyGhost();setViewerMsg((S.models[pid]||[]).length?"":"Nenhum modelo carregado neste projeto. Envie IFCs em Modelos IFC.")}
+
+/* --- seleção, destaque, isolamento --- */
+function subsetMesh(idxs,color,{offset=0,useOwn=false}={}){
+  let nv=0,ni=0;for(const i of idxs) for(const g of ELEMS[i].geoms){nv+=g.p.length/3;ni+=g.i.length}
+  const P=new Float32Array(nv*3),N=new Float32Array(nv*3),E=new Float32Array(nv),C=useOwn?new Float32Array(nv*3):null,I=new Uint32Array(ni);let vo=0,io=0;
+  for(const i of idxs) for(const g of ELEMS[i].geoms){const n=g.p.length/3;P.set(g.p,vo*3);N.set(g.n,vo*3);E.fill(i,vo,vo+n);
+    if(C) for(let k=0;k<n;k++){C[(vo+k)*3]=g.c[0];C[(vo+k)*3+1]=g.c[1];C[(vo+k)*3+2]=g.c[2]}
+    for(let k=0;k<g.i.length;k++) I[io+k]=g.i[k]+vo;vo+=n;io+=g.i.length}
+  const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.BufferAttribute(P,3));geo.setAttribute("normal",new THREE.BufferAttribute(N,3));
+  geo.setAttribute("eid",new THREE.BufferAttribute(E,1));if(C) geo.setAttribute("color",new THREE.BufferAttribute(C,3));geo.setIndex(new THREE.BufferAttribute(I,1));
+  const mat=new THREE.MeshLambertMaterial({color:useOwn?0xffffff:color,vertexColors:useOwn,side:THREE.DoubleSide,polygonOffset:offset!==0,polygonOffsetFactor:offset,polygonOffsetUnits:offset*4});
+  return new THREE.Mesh(geo,mat);
+}
+function clearGroup(gr){for(const c of [...gr.children]){gr.remove(c);c.geometry.dispose();c.material.dispose()}V.dirty=true}
+function clearHL(){clearGroup(V.hl)}
+function selectElements(idxs,{silent=false}={}){
+  V.sel=idxs;V.pair=null;clearHL();
+  if(idxs.length){const accent=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#e2701f";V.hl.add(subsetMesh(idxs,new THREE.Color(accent),{offset:-2}))}
+  $("#vlegend").hidden=true;V.dirty=true;
+  if(!silent) renderProps();
+}
+function setGhost(on){V.ghost=on;applyGhost()}
+function applyGhost(){
+  for(const c of V.root.children){const b=c.material.userData.base;
+    if(V.ghost){c.material.transparent=true;c.material.opacity=Math.min(b.op,0.08);c.material.depthWrite=false}
+    else{c.material.transparent=b.transparent;c.material.opacity=b.op;c.material.depthWrite=true}
+    c.material.needsUpdate=true}
+  V.dirty=true;
+}
+function isolate(idxs){
+  if(V.pair){setGhost(true);return}
+  if(!idxs.length) return;
+  clearGroup(V.iso);V.iso.add(subsetMesh(idxs,null,{useOwn:true}));setGhost(true);fitView(boxOf(idxs));
+}
+function clearIsolation(){clearGroup(V.iso);setGhost(false)}
+function boxOf(idxs){const b=new THREE.Box3();for(const i of idxs) b.union(ELEMS[i].box);return b}
+function fitView(box){
+  if(!box){box=new THREE.Box3();for(const c of V.root.children) if(c.visible){c.geometry.computeBoundingBox();box.union(c.geometry.boundingBox)}}
+  if(box.isEmpty()) return;
+  const c=box.getCenter(new THREE.Vector3()),r=Math.max(box.getSize(new THREE.Vector3()).length()/2,0.6);
+  const dir=V.camera.position.clone().sub(V.controls.target).normalize();if(dir.lengthSq()<.5) dir.set(1,.8,1).normalize();
+  const dist=r/Math.sin(THREE.MathUtils.degToRad(V.camera.fov/2))*1.1;
+  V.controls.target.copy(c);V.camera.position.copy(c.clone().add(dir.multiplyScalar(dist)));
+  V.camera.near=Math.max(dist/2000,0.01);V.camera.far=dist*200;V.camera.updateProjectionMatrix();
+  const gy=box.min.y;V.grid.position.set(c.x,gy-0.01,c.z);V.dirty=true;
+}
+function pick(e){
+  const r=V.renderer.domElement.getBoundingClientRect();
+  const mouse=new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);
+  const rc=new THREE.Raycaster();rc.setFromCamera(mouse,V.camera);
+  const targets=V.iso.children.length?[...V.iso.children,...(V.ghost?[]:V.root.children.filter(c=>c.visible))]:V.root.children.filter(c=>c.visible);
+  const hits=rc.intersectObjects(targets,false);
+  if(!hits.length){if(!V.pair) selectElements([]);return}
+  const h=hits[0];const idx=h.object.geometry.attributes.eid.getX(h.face.a);
+  if(V.pair){V.pairFocus=V.pairFocus===idx?null:idx;renderReviewCard();return}
+  selectElements([idx]);
+}
+function takeSnapshot(){
+  V.renderer.render(V.scene,V.camera);
+  const url=V.renderer.domElement.toDataURL("image/png");
+  if(DB.view==="revisao"&&S.ui.reviewSel){
+    const c=currentClashes().find(x=>x.id===S.ui.reviewSel);
+    if(c){c.snapshots=c.snapshots||[];c.snapshots.push(url);c.viewpoint=cameraViewpoint();logHist(c,"Snapshot criado");persistDecision(c);renderReviewCard();toast("Snapshot salvo no clash.");return}
+  }
+  toast("Snapshot capturado. Na revisão de clashes ele fica salvo no item.");
+}
+function cameraViewpoint(){
+  // display (Y para cima, deslocado) → coordenadas IFC (Z para cima, metros)
+  const o=GLOBAL_OFFSET||[0,0,0];
+  const p=V.camera.position,d=V.controls.target.clone().sub(p).normalize();
+  const toIfc=(x,y,z)=>[x,-z,y];
+  const P=toIfc(p.x+o[0],p.y+o[1],p.z+o[2]),D=toIfc(d.x,d.y,d.z);
+  return {pos:P,dir:D,up:[0,0,1],fov:V.camera.fov};
+}
+
+/* --- propriedades --- */
+function psetsOf(el){
+  if(el._psets) return el._psets;
+  const m=el.m,out=[];
+  const read=(id,fromType)=>{
+    let l;try{l=api.GetLine(m.mid,id,true)}catch(e){return}
+    const tn=TYPE_NAME[l.type]||"";
+    const name=decIfc(val(l.Name))||tn;
+    const props=[];
+    if(tn==="IFCPROPERTYSET"){
+      for(const p of l.HasProperties||[]){
+        const pn=decIfc(val(p.Name));let v=null;
+        if(p.NominalValue!==undefined) v=val(p.NominalValue);
+        else if(p.EnumerationValues) v=(p.EnumerationValues||[]).map(val).join(", ");
+        else if(p.ListValues) v=(p.ListValues||[]).map(val).join(", ");
+        else if(p.UpperBoundValue||p.LowerBoundValue) v=[val(p.LowerBoundValue),val(p.UpperBoundValue)].filter(x=>x!=null).join(" – ");
+        props.push([pn,fmtVal(v)]);
+      }
+    }else if(tn==="IFCELEMENTQUANTITY"){
+      for(const q of l.Quantities||[]){
+        const v=val(q.LengthValue??q.AreaValue??q.VolumeValue??q.CountValue??q.WeightValue??q.TimeValue);
+        props.push([decIfc(val(q.Name)),fmtVal(v)]);
+      }
+    }else return;
+    out.push({name,props,fromType,qto:tn==="IFCELEMENTQUANTITY"});
+  };
+  for(const id of m.psetsOf[el.eid]||[]) read(id,false);
+  const t=m.typeOf[el.eid];
+  if(t!=null){try{const tl=api.GetLine(m.mid,t,false);for(const r of tl.HasPropertySets||[]) read(val(r),true)}catch(e){}}
+  el._psets=out;return out;
+}
+function fmtVal(v){
+  if(v==null) return "";
+  if(v==="T"||v===true) return "Sim"; if(v==="F"||v===false) return "Não";
+  if(typeof v==="number") return Math.abs(v)>=1e-4||v===0?String(Math.round(v*10000)/10000).replace(".",","):String(v);
+  return decIfc(String(v));
+}
+function layerOf(el){
+  if(el._layer!==undefined) return el._layer;
+  let name="";
+  try{const pds=api.GetLine(el.m.mid,el.rep,false);for(const r of pds.Representations||[]){const n=el.m.layerOfRep[val(r)];if(n){name=n;break}}}catch(e){}
+  el._layer=name;return name;
+}
+function visusFields(el){
+  return [
+    ["Disciplina",el.m.disc],["Entidade",entityName(el.cls)],["ID IFC",el.guid,"mono"],["Layer",layerOf(el)],
+    ["Nome da edificação",el.m.building],["Nome do arquivo",el.m.file],["Pavimento",el.storey],["Type",el.typeName||el.objType],
+  ];
+}
+function extraFields(el){
+  return [["Nome",el.name],["Classe IFC",ifcPretty(el.cls)],["PredefinedType",el.predef],["Sistema",el.system],["Tag",el.tag],
+    ["Dimensões (mm)",el.size.map(v=>fmt(v)).join(" × ")]];
+}
+
+/* ===================================================================== */
+/*  Motor de clash (prévia no navegador — caixas envolventes)             */
+/* ===================================================================== */
+function inGroup(el,g){
+  if(g==="FORRO") return el.cls==="IFCCOVERING";
+  if(g==="EQUIP") return EQUIP.has(el.cls);
+  if(g==="MEP") return isMep(el);
+  return el.group===g;
+}
+function propMap(el){
+  if(el._pm) return el._pm;const pm={};for(const ps of psetsOf(el)){const o=pm[ps.name]||(pm[ps.name]={});for(const [k,v] of ps.props) o[k]=v}
+  el._pm=pm;return pm;
+}
+function excludedBy(el,P){
+  if(P.excluded.includes(el.cls)) return "Entidade excluída: "+entityName(el.cls);
+  for(const f of P.filters){
+    if(!f.on) continue;
+    if(f.kind==="entity"){if(el.cls===f.cls) return "Filtro de entidade: "+entityName(f.cls);continue}
+    const pm=propMap(el);const ps=pm[f.pset];const v=ps?ps[f.prop]:undefined;
+    const want=String(f.value??"").trim().toLowerCase(),have=v==null?null:String(v).trim().toLowerCase();
+    let hit=false;
+    if(f.op==="existe") hit=v!==undefined;
+    else if(f.op==="=") hit=have!==null&&have===want;
+    else if(f.op==="≠") hit=have!==null&&have!==want;
+    else if(f.op==="contém") hit=have!==null&&have.includes(want);
+    if(hit) return `Filtro: ${f.pset}.${f.prop} ${f.op} ${f.value??""}`.trim();
+  }
+  return null;
+}
+function pairKey(a,b){return [a.guid,b.guid].sort().join("|")}
+/* ---- Teste geométrico fino (malha de triângulos) ---- */
+function trisIn(el,b){ // triângulos do elemento cuja caixa toca a caixa b → [ax,ay,az,bx,by,bz,cx,cy,cz,...]
+  const out=[];
+  for(const g of el.geoms){const P=g.p,I=g.i;
+    for(let k=0;k<I.length;k+=3){const a=I[k]*3,bb=I[k+1]*3,c=I[k+2]*3;
+      const x0=Math.min(P[a],P[bb],P[c]),x1=Math.max(P[a],P[bb],P[c]);if(x1<b[0]||x0>b[3]) continue;
+      const y0=Math.min(P[a+1],P[bb+1],P[c+1]),y1=Math.max(P[a+1],P[bb+1],P[c+1]);if(y1<b[1]||y0>b[4]) continue;
+      const z0=Math.min(P[a+2],P[bb+2],P[c+2]),z1=Math.max(P[a+2],P[bb+2],P[c+2]);if(z1<b[2]||z0>b[5]) continue;
+      out.push(P[a],P[a+1],P[a+2],P[bb],P[bb+1],P[bb+2],P[c],P[c+1],P[c+2]);}}
+  return out;
+}
+function segTri(px,py,pz,qx,qy,qz,T,o,out){ // segmento PQ × triângulo T[o..o+8]; empilha o ponto de cruzamento
+  const ax=T[o],ay=T[o+1],az=T[o+2];
+  const e1x=T[o+3]-ax,e1y=T[o+4]-ay,e1z=T[o+5]-az,e2x=T[o+6]-ax,e2y=T[o+7]-ay,e2z=T[o+8]-az;
+  const dx=qx-px,dy=qy-py,dz=qz-pz;
+  const hx=dy*e2z-dz*e2y,hy=dz*e2x-dx*e2z,hz=dx*e2y-dy*e2x;
+  const det=e1x*hx+e1y*hy+e1z*hz;if(Math.abs(det)<1e-14) return false;
+  const inv=1/det,sx=px-ax,sy=py-ay,sz=pz-az;
+  const u=(sx*hx+sy*hy+sz*hz)*inv;if(u<0||u>1) return false;
+  const qx2=sy*e1z-sz*e1y,qy2=sz*e1x-sx*e1z,qz2=sx*e1y-sy*e1x;
+  const v=(dx*qx2+dy*qy2+dz*qz2)*inv;if(v<0||u+v>1) return false;
+  const t=(e2x*qx2+e2y*qy2+e2z*qz2)*inv;if(t<0||t>1) return false;
+  if(out) out.push(px+dx*t,py+dy*t,pz+dz*t);
+  return true;
+}
+function triBoxOverlap(T,i,U,j){
+  for(let k=0;k<3;k++){const a0=Math.min(T[i+k],T[i+3+k],T[i+6+k]),a1=Math.max(T[i+k],T[i+3+k],T[i+6+k]);
+    const b0=Math.min(U[j+k],U[j+3+k],U[j+6+k]),b1=Math.max(U[j+k],U[j+3+k],U[j+6+k]);if(a1<b0||b1<a0) return false}
+  return true;
+}
+function crossPoints(TA,TB,out,limit=40000){ // pontos da curva de interseção entre as duas malhas
+  let n=0;
+  for(let i=0;i<TA.length;i+=9) for(let j=0;j<TB.length;j+=9){
+    if(++n>limit) return;
+    if(!triBoxOverlap(TA,i,TB,j)) continue;
+    for(let e=0;e<3;e++){const p=i+e*3,q=i+((e+1)%3)*3;segTri(TA[p],TA[p+1],TA[p+2],TA[q],TA[q+1],TA[q+2],TB,j,out)}
+    for(let e=0;e<3;e++){const p=j+e*3,q=j+((e+1)%3)*3;segTri(TB[p],TB[p+1],TB[p+2],TB[q],TB[q+1],TB[q+2],TA,i,out)}
+  }
+}
+function allTris(el){if(el._tris) return el._tris;el._tris=trisIn(el,[-Infinity,-Infinity,-Infinity,Infinity,Infinity,Infinity]);return el._tris}
+function pointInside(x,y,z,el){ // paridade de um raio levemente inclinado
+  const T=allTris(el);let c=0;const L=1e4;
+  for(let o=0;o<T.length;o+=9) if(segTri(x,y,z,x+L,y+L*0.00131,z+L*0.00071,T,o,null)) c++;
+  return (c&1)===1;
+}
+function insideVerts(src,dst,b,out,cap=160){
+  let n=0;
+  for(const g of src.geoms){const P=g.p;for(let k=0;k<P.length;k+=3){
+    const x=P[k],y=P[k+1],z=P[k+2];
+    if(x<b[0]||x>b[3]||y<b[1]||y>b[4]||z<b[2]||z>b[5]) continue;
+    if(++n>cap) return;
+    if(pointInside(x,y,z,dst)) out.push(x,y,z);
+  }}
+}
+function ptTriDist2(px,py,pz,T,o){ // Ericson, ponto mais próximo no triângulo
+  const ax=T[o],ay=T[o+1],az=T[o+2],bx=T[o+3],by=T[o+4],bz=T[o+5],cx=T[o+6],cy=T[o+7],cz=T[o+8];
+  const abx=bx-ax,aby=by-ay,abz=bz-az,acx=cx-ax,acy=cy-ay,acz=cz-az,apx=px-ax,apy=py-ay,apz=pz-az;
+  const d1=abx*apx+aby*apy+abz*apz,d2=acx*apx+acy*apy+acz*apz;let rx,ry,rz;
+  if(d1<=0&&d2<=0){rx=ax;ry=ay;rz=az}else{
+  const bpx=px-bx,bpy=py-by,bpz=pz-bz,d3=abx*bpx+aby*bpy+abz*bpz,d4=acx*bpx+acy*bpy+acz*bpz;
+  if(d3>=0&&d4<=d3){rx=bx;ry=by;rz=bz}else{
+  const vc=d1*d4-d3*d2;
+  if(vc<=0&&d1>=0&&d3<=0){const v=d1/(d1-d3);rx=ax+v*abx;ry=ay+v*aby;rz=az+v*abz}else{
+  const cpx=px-cx,cpy=py-cy,cpz=pz-cz,d5=abx*cpx+aby*cpy+abz*cpz,d6=acx*cpx+acy*cpy+acz*cpz;
+  if(d6>=0&&d5<=d6){rx=cx;ry=cy;rz=cz}else{
+  const vb=d5*d2-d1*d6;
+  if(vb<=0&&d2>=0&&d6<=0){const w=d2/(d2-d6);rx=ax+w*acx;ry=ay+w*acy;rz=az+w*acz}else{
+  const va=d3*d6-d5*d4;
+  if(va<=0&&(d4-d3)>=0&&(d5-d6)>=0){const w=(d4-d3)/((d4-d3)+(d5-d6));rx=bx+w*(cx-bx);ry=by+w*(cy-by);rz=bz+w*(cz-bz)}else{
+  const den=1/(va+vb+vc),v=vb*den,w=vc*den;rx=ax+abx*v+acx*w;ry=ay+aby*v+acy*w;rz=az+abz*v+acz*w}}}}}}
+  return (px-rx)**2+(py-ry)**2+(pz-rz)**2;
+}
+function segSegDist2(p1,q1,p2,q2){ // Ericson
+  const d1=[q1[0]-p1[0],q1[1]-p1[1],q1[2]-p1[2]],d2=[q2[0]-p2[0],q2[1]-p2[1],q2[2]-p2[2]],r=[p1[0]-p2[0],p1[1]-p2[1],p1[2]-p2[2]];
+  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];const a=dot(d1,d1),e=dot(d2,d2),f=dot(d2,r);let s,t;
+  if(a<=1e-12&&e<=1e-12){s=t=0}else if(a<=1e-12){s=0;t=Math.min(1,Math.max(0,f/e))}else{const c=dot(d1,r);
+    if(e<=1e-12){t=0;s=Math.min(1,Math.max(0,-c/a))}else{const b=dot(d1,d2),den=a*e-b*b;s=den!==0?Math.min(1,Math.max(0,(b*f-c*e)/den)):0;t=(b*s+f)/e;
+      if(t<0){t=0;s=Math.min(1,Math.max(0,-c/a))}else if(t>1){t=1;s=Math.min(1,Math.max(0,(b-c)/a))}}}
+  const x=p1[0]+d1[0]*s-(p2[0]+d2[0]*t),y=p1[1]+d1[1]*s-(p2[1]+d2[1]*t),z=p1[2]+d1[2]*s-(p2[2]+d2[2]*t);return x*x+y*y+z*z;
+}
+function meshDistance(TA,TB,limit=60000){
+  let best=Infinity,n=0;
+  for(let i=0;i<TA.length;i+=9) for(let j=0;j<TB.length;j+=9){
+    if(++n>limit) return Math.sqrt(best);
+    for(let k=0;k<3;k++){best=Math.min(best,ptTriDist2(TA[i+k*3],TA[i+k*3+1],TA[i+k*3+2],TB,j),ptTriDist2(TB[j+k*3],TB[j+k*3+1],TB[j+k*3+2],TA,i))}
+    for(let e=0;e<3;e++) for(let f=0;f<3;f++){
+      const p1=[TA[i+e*3],TA[i+e*3+1],TA[i+e*3+2]],q1=[TA[i+((e+1)%3)*3],TA[i+((e+1)%3)*3+1],TA[i+((e+1)%3)*3+2]];
+      const p2=[TB[j+f*3],TB[j+f*3+1],TB[j+f*3+2]],q2=[TB[j+((f+1)%3)*3],TB[j+((f+1)%3)*3+1],TB[j+((f+1)%3)*3+2]];
+      best=Math.min(best,segSegDist2(p1,q1,p2,q2));}
+  }
+  return Math.sqrt(best);
+}
+/* retorna {hit:boolean, value(mm), center:[x,y,z]} usando a geometria real */
+function exactTest(a,b,kind,tolM){
+  const pad=kind==="clearance"?tolM:0.0005;
+  const bx=[Math.max(a.box.min.x,b.box.min.x)-pad,Math.max(a.box.min.y,b.box.min.y)-pad,Math.max(a.box.min.z,b.box.min.z)-pad,
+            Math.min(a.box.max.x,b.box.max.x)+pad,Math.min(a.box.max.y,b.box.max.y)+pad,Math.min(a.box.max.z,b.box.max.z)+pad];
+  if(bx[0]>bx[3]||bx[1]>bx[4]||bx[2]>bx[5]) return null;
+  const TA=trisIn(a,bx),TB=trisIn(b,bx);if(!TA.length&&!TB.length) return null;
+  const pts=[];if(TA.length&&TB.length) crossPoints(TA,TB,pts);
+  insideVerts(a,b,bx,pts);insideVerts(b,a,bx,pts);
+  if(pts.length){
+    let x0=Infinity,y0=Infinity,z0=Infinity,x1=-Infinity,y1=-Infinity,z1=-Infinity;
+    for(let k=0;k<pts.length;k+=3){const x=pts[k],y=pts[k+1],z=pts[k+2];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;if(z<z0)z0=z;if(z>z1)z1=z}
+    const depth=Math.min(x1-x0,y1-y0,z1-z0)*1000;
+    return {inter:true,value:depth,center:[(x0+x1)/2,(y0+y1)/2,(z0+z1)/2]};
+  }
+  if(kind!=="clearance"||!TA.length||!TB.length) return null;
+  const d=meshDistance(TA,TB);
+  return d<tolM?{inter:false,value:d*1000,center:[(bx[0]+bx[3])/2,(bx[1]+bx[4])/2,(bx[2]+bx[5])/2]}:null;
+}
+function runAnalysis(){
+  const P=proj();const models=(S.models[P.id]||[]).filter(m=>m.status==="pronto");
+  if(!models.length){toast("Carregue ao menos um modelo IFC.");return}
+  const t0=performance.now();
+  const all=models.flatMap(m=>m.elems.map(i=>ELEMS[i]));
+  const excluded=[];const pool=[];
+  for(const el of all){const why=excludedBy(el,P);if(why) excluded.push({el,why});else pool.push(el)}
+  const found=new Map();
+  const tests=P.tests.filter(t=>t.on).sort((a,b)=>a.ordem-b.ordem);
+  let below=0,rejected=0,nNarrow=0;const checked=new Set();
+  for(const t of tests){
+    const A=pool.filter(e=>inGroup(e,t.a)),B=pool.filter(e=>inGroup(e,t.b));
+    if(!A.length||!B.length) continue;
+    const tol=t.tol/1000,same=t.a===t.b;
+    const pad=t.kind==="clearance"?tol:0;
+    const Bs=[...B].sort((x,y)=>x.box.min.x-y.box.min.x);
+    for(const a of A){
+      const ax0=a.box.min.x-pad,ax1=a.box.max.x+pad;
+      for(let j=0;j<Bs.length;j++){
+        const b=Bs[j];if(b.box.min.x>ax1) break;if(b.box.max.x<ax0) continue;
+        if(a===b) continue;if(same&&a.idx>b.idx&&inGroup(b,t.a)&&inGroup(a,t.b)) continue;
+        const ox=Math.min(a.box.max.x,b.box.max.x)-Math.max(a.box.min.x,b.box.min.x);
+        const oy=Math.min(a.box.max.y,b.box.max.y)-Math.max(a.box.min.y,b.box.min.y);
+        const oz=Math.min(a.box.max.z,b.box.max.z)-Math.max(a.box.min.z,b.box.min.z);
+        if(ox<-pad||oy<-pad||oz<-pad) continue;
+        if(t.kind==="hard"&&(ox<=0||oy<=0||oz<=0)) continue;
+        const key=pairKey(a,b);if(found.has(key)||checked.has(key+t.id)) continue;
+        checked.add(key+t.id);nNarrow++;
+        const r=exactTest(a,b,t.kind,tol);
+        if(!r){if(t.kind==="hard") rejected++;continue}
+        let value=r.value,hit=false;
+        if(t.kind==="hard"){if(value>t.tol+0.5) hit=true; else below++}
+        else hit=true;
+        if(!hit) continue;
+        const center=new THREE.Vector3(...r.center);
+        found.set(key,{id:key,key,a:a.idx,b:b.idx,test:t.id,testName:`${GROUPS[t.a]} × ${GROUPS[t.b]}`,kind:t.kind,tol:t.tol,value:Math.round(value*10)/10,center:center.toArray()});
+      }
+    }
+  }
+  const list=[...found.values()];
+  for(const c of list){prepareClash(c,P)}
+  list.sort((x,y)=>levelRank(x.level)-levelRank(y.level)||CLS_ORDER.indexOf(x.cls)-CLS_ORDER.indexOf(y.cls));
+  S.clashes[P.id]=list;
+  S.lastRun[P.id]={date:new Date().toISOString(),ms:Math.round(performance.now()-t0),elements:all.length,pool:pool.length,excluded,below,rejected,narrow:nNarrow,tests:tests.length};
+  renderAll();
+  const pend=list.filter(c=>c.state!=="validado").length;
+  toast(`${list.length} clashes encontrados · ${pend} aguardando sua revisão.`);
+}
+function levelOrder(){
+  const P=proj();const ms=(S.models[P.id]||[]).filter(m=>m.storeys);
+  const map=new Map();for(const m of ms) for(const s of m.storeys) if(!map.has(s.name)||map.get(s.name)>s.elev*(m.unitScale||1)) map.set(s.name,s.elev*(m.unitPrefix==="MILLI"?0.001:1));
+  return [...map.entries()].sort((a,b)=>a[1]-b[1]).map(e=>e[0]);
+}
+function levelRank(name){const o=levelOrder();const i=o.indexOf(name);return i<0?999:i}
+function suggest(c,P){
+  const A=ELEMS[c.a],B=ELEMS[c.b];
+  for(const r of RULES){const cfg=P.rules[r.id]||{on:true,cls:r.cls};if(!cfg.on) continue;
+    let ok=false;try{ok=r.test(c,A,B)}catch(e){}
+    if(ok) return {cls:cfg.cls,reason:r.reason,rule:r.id,cond:r.cond};
+  }
+  return {cls:"P3",reason:"Sem regra aplicável.",rule:null};
+}
+function responsible(c,P){
+  const A=ELEMS[c.a],B=ELEMS[c.b];
+  const ord=P.flexOrder;const ra=ord.indexOf(A.code),rb=ord.indexOf(B.code);
+  const ia=ra<0?ord.length:ra,ib=rb<0?ord.length:rb;
+  const mover=ib>=ia?B:A, other=mover===A?B:A;
+  const mem=memberFor(mover.code);
+  return {code:mover.code||mover.group,member:mem?mem.id:"",mover:mover.idx,other:other.idx};
+}
+function prepareClash(c,P){
+  const A=ELEMS[c.a],B=ELEMS[c.b];
+  c.suggested=suggest(c,P);
+  const r=responsible(c,P);
+  c.respSuggested=r.member;c.respCode=r.code;
+  c.level=ELEMS[r.mover].storey!=="Sem pavimento"?ELEMS[r.mover].storey:ELEMS[r.other].storey;
+  const codes=[A.code||A.group,B.code||B.group];
+  c.title=codes[0]===codes[1]?codes[0]:codes.join("_");
+  const d=P.decisions[c.key];
+  if(d){Object.assign(c,{cls:d.cls,resp:d.resp,state:d.state,status:d.status||"Aberto",comments:d.comments||[],history:d.history||[],snapshots:d.snapshots||[],topicType:d.topicType||"Clash",issueIndex:d.issueIndex,guid:d.guid,created:d.created,viewpoint:d.viewpoint})}
+  else Object.assign(c,{cls:c.suggested.cls,resp:c.suggested.cls==="FALSO"?"":r.member,state:"sugerido",status:"Aberto",comments:[],history:[{date:new Date().toISOString(),text:`Pré-classificado como ${CLASSES[c.suggested.cls].label} (${c.suggested.cond||"regra padrão"})`}],snapshots:[],topicType:"Clash"});
+}
+function persistDecision(c){
+  const P=proj();
+  P.decisions[c.key]={cls:c.cls,resp:c.resp,state:c.state,status:c.status,comments:c.comments,history:c.history.slice(-30),snapshots:(c.snapshots||[]).slice(-3),topicType:c.topicType,issueIndex:c.issueIndex,guid:c.guid,created:c.created,viewpoint:c.viewpoint};
+  save();
+}
+function logHist(c,text){(c.history||(c.history=[])).push({date:new Date().toISOString(),text,by:coordinator().name})}
+const currentClashes=()=>S.clashes[DB.current]||[];
+const pendingCount=()=>currentClashes().filter(c=>c.state!=="validado").length;
+function validate(c,changes={}){
+  const before={cls:c.cls,resp:c.resp};
+  Object.assign(c,changes);
+  if(c.state!=="validado"){
+    c.state="validado";
+    const agreed=c.cls===c.suggested.cls;
+    logHist(c,agreed?`Classificação confirmada: ${CLASSES[c.cls].label}`:`Classificação alterada de ${CLASSES[c.suggested.cls].label} para ${CLASSES[c.cls].label}`);
+    if(c.cls!=="FALSO"&&!c.issueIndex){const P=proj();P.issueSeq=(P.issueSeq||0)+1;c.issueIndex=P.issueSeq;c.guid=uid();c.created=new Date().toISOString();logHist(c,`Issue #${c.issueIndex} criado`)}
+    if(!c.viewpoint) c.viewpoint=cameraViewpoint();
+  }else{
+    if(before.cls!==c.cls) logHist(c,`Classificação: ${CLASSES[before.cls].label} → ${CLASSES[c.cls].label}`);
+    if(before.resp!==c.resp) logHist(c,`Responsável alterado para ${memberName(c.resp)}`);
+  }
+  persistDecision(c);
+}
+function memberName(id){const m=proj().team.find(x=>x.id===id);return m?m.name:"Sem responsável"}
+function memberEmail(id){const m=proj().team.find(x=>x.id===id);return m?(m.email||m.name):""}
+
+/* ===================================================================== */
+/*  Interface                                                             */
+/* ===================================================================== */
+const ICON={
+  projeto:'<path d="M3 7h6l2 2h10v10H3z"/>',
+  modelos:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  visualizador:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  regras:'<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  clashes:'<circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/>',
+  revisao:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7H4V5h11"/>',
+  issues:'<path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/>',
+  bcf:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 14h6"/>',
+};
+const NAV=[["projeto","Projeto e equipe","1"],["modelos","Modelos IFC","2"],["visualizador","Visualizador","3"],["regras","Regras de análise","4"],null,
+  ["clashes","Clashes por nível","5"],["revisao","Revisão","6"],["issues","Issues","7"],["bcf","BCF 2.1","8"]];
+function renderNav(){
+  const pend=pendingCount();
+  $("#rail").innerHTML=NAV.map(n=>n?`<button data-nav="${n[0]}" ${DB.view===n[0]?'aria-current="page"':""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[n[0]]}</svg>${n[1]}${n[0]==="revisao"&&pend?`<span class="badge num">${pend}</span>`:`<span class="step">${n[2]}</span>`}</button>`:'<div class="sep"></div>').join("");
+  const sel=$("#projectSelect");sel.innerHTML=DB.projects.map(p=>`<option value="${p.id}" ${p.id===DB.current?"selected":""}>${esc(p.name)}</option>`).join("");
+  const pill=$("#reviewPill");
+  if(pend){pill.hidden=false;pill.className="pill warn";pill.innerHTML=`<span class="dot"></span><span class="num">${pend}</span>&nbsp;clashes pré-classificados aguardam revisão`}
+  else pill.hidden=true;
+}
+function go(view){DB.view=view;save();renderAll();$("#main").scrollTop=0}
+function renderAll(){
+  renderNav();
+  const v=DB.view, main=$("#main");
+  // tira o visualizador antes de reescrever a área
+  const viewer=$("#viewer");if(viewer.parentElement!==document.body){document.body.appendChild(viewer);viewer.hidden=true}
+  const fn={projeto:viewProjeto,modelos:viewModelos,visualizador:viewVisualizador,regras:viewRegras,clashes:viewClashes,revisao:viewRevisao,issues:viewIssues,bcf:viewBcf}[v]||viewProjeto;
+  main.innerHTML=fn();
+  if(v==="visualizador"){mountViewer($("#vslot"));if(V.pair){V.pair=null;clearHL();clearIsolation();$("#vlegend").hidden=true;setTimeout(()=>fitView(),30);setStatus("Clique em um elemento para ver as propriedades.")}renderTree();renderProps()}
+  if(v==="revisao"){mountViewer($("#rslot"));renderQueue();renderReviewCard(true)}
+}
+function renderModelsProgress(){if(DB.view==="modelos") renderAll()}
+
+/* ---------- 1. Projeto e equipe ---------- */
+function viewProjeto(){
+  const P=proj();const ms=S.models[P.id]||[];const cl=currentClashes();
+  const nEl=ms.reduce((s,m)=>s+m.elems.length,0);
+  const real=cl.filter(c=>c.cls!=="FALSO");const tot=real.length;
+  const dist=CLS_ORDER.filter(k=>k!=="FALSO").map(k=>[k,real.filter(c=>c.cls===k).length]);
+  const issues=cl.filter(c=>c.issueIndex&&c.cls!=="FALSO");const resolved=issues.filter(c=>c.status==="Resolvido"||c.status==="Fechado").length;
+  return `<section class="view stack">
+    <div><h1>${esc(P.name)}</h1><p class="lede">${P.example?"Projeto de exemplo carregado com modelos IFC fictícios. Crie um projeto novo para trabalhar com os seus IFCs.":"Cadastre a equipe e envie os modelos IFC de cada disciplina."}</p></div>
+    <div class="grid2">
+      <div class="panel stack">
+        <h2>Dados do projeto</h2>
+        <label class="fld">Nome do projeto<input type="text" id="pName" value="${esc(P.name)}"></label>
+        <label class="fld">Descrição<textarea id="pDesc" rows="3">${esc(P.desc||"")}</textarea></label>
+        ${P.example?"":`<div><button class="btn small" id="delProject">Excluir projeto</button></div>`}
+      </div>
+      <div class="panel stack">
+        <h2>Situação da coordenação</h2>
+        <div class="row" style="gap:24px">
+          <div><div class="muted" style="font-size:12px">Modelos</div><div style="font:600 22px var(--font-cond)" class="num">${ms.filter(m=>m.status==="pronto").length}</div></div>
+          <div><div class="muted" style="font-size:12px">Elementos</div><div style="font:600 22px var(--font-cond)" class="num">${fmt(nEl)}</div></div>
+          <div><div class="muted" style="font-size:12px">Clashes reais</div><div style="font:600 22px var(--font-cond)" class="num">${tot}</div></div>
+          <div><div class="muted" style="font-size:12px">Falsos clashes</div><div style="font:600 22px var(--font-cond)" class="num">${cl.length-tot}</div></div>
+          <div title="KPI 1 do manual: resolvidos ÷ identificados"><div class="muted" style="font-size:12px">TRC</div><div style="font:600 22px var(--font-cond)" class="num">${issues.length?fmt(resolved/issues.length*100)+"%":"—"}</div></div>
+        </div>
+        <div><div class="muted" style="font-size:12px;margin-bottom:6px">Distribuição por severidade (KPI 6)</div>
+          ${tot?`<div class="sevbar">${dist.map(([k,n])=>n?`<span style="width:${n/tot*100}%;background:var(--${k.toLowerCase()})" title="${CLASSES[k].label}: ${n}"></span>`:"").join("")}</div>
+          <div class="row" style="gap:10px;margin-top:8px;font-size:12px">${dist.map(([k,n])=>`<span><span class="chip ${k}">${k}</span> <span class="num">${n} · ${fmt(n/tot*100)}%</span></span>`).join("")}</div>`:`<div class="muted" style="font-size:13px">Rode a análise de clashes para ver a distribuição.</div>`}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2>Equipe do projeto</h2><button class="btn small" id="addMember">+ Adicionar integrante</button></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Nome</th><th>Cargo / função</th><th title="Códigos de disciplina pelos quais a pessoa responde (ex.: ELE, SCE)">Disciplinas (códigos)</th><th>E-mail</th><th title="Coordenador BIM valida os clashes">Coord.</th><th></th></tr></thead>
+        <tbody>${P.team.map(m=>`<tr data-mid="${m.id}">
+          <td><input type="text" data-f="name" value="${esc(m.name)}" aria-label="Nome"></td>
+          <td><input type="text" data-f="role" value="${esc(m.role)}" aria-label="Cargo"></td>
+          <td><input type="text" data-f="codes" value="${esc(m.codes)}" placeholder="ex.: SAN, PCI" aria-label="Disciplinas"></td>
+          <td><input type="email" data-f="email" value="${esc(m.email)}" aria-label="E-mail"></td>
+          <td class="tight"><input type="radio" name="coord" data-f="coord" ${m.coord?"checked":""} aria-label="Coordenador"></td>
+          <td class="tight"><button class="btn small ghost" data-del-member="${m.id}" aria-label="Remover">Remover</button></td></tr>`).join("")}</tbody>
+      </table></div>
+      <p class="muted" style="font-size:12.5px;margin:10px 0 0">O responsável de cada clash é sugerido pelo código de disciplina do modelo que deve se adaptar (ordem de flexibilidade em Regras). </p>
+    </div>
+  </section>`;
+}
+
+/* ---------- 2. Modelos ---------- */
+function viewModelos(){
+  const P=proj();const ms=S.models[P.id]||[];
+  const discOpts=(cur)=>Object.entries(CODE_INFO).map(([k,v])=>`<option value="${k}" ${k===cur?"selected":""}>${k} — ${esc(v[0])}</option>`).join("")+`<option value="" ${!cur?"selected":""}>A definir</option>`;
+  return `<section class="view stack">
+    <div><h1>Modelos IFC</h1><p class="lede">Envie um arquivo por disciplina. A disciplina é lida do código no nome do arquivo (ex.: PROJ-<b>SAN</b>-R00.ifc) e pode ser ajustada.</p></div>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Enviar arquivos IFC">
+      <div style="font-weight:600">Arraste arquivos .ifc aqui ou clique para selecionar</div>
+      <div class="muted" style="font-size:12.5px;margin-top:4px">Os arquivos são lidos no seu navegador. Neste protótipo eles não ficam salvos: ao reabrir a página, envie de novo.</div>
+    </div>
+    ${engineError?`<div class="alert"><div class="grow"><b>O motor IFC não carregou.</b> ${esc(engineError.message||engineError)}</div></div>`:""}
+    <div class="panel">
+      ${ms.length?`<div class="tbl-wrap"><table>
+        <thead><tr><th>Arquivo</th><th>Disciplina</th><th>Elementos</th><th>Pavimentos</th><th>Situação</th><th>Visível</th><th></th></tr></thead>
+        <tbody>${ms.map(m=>`<tr data-model="${m.id}">
+          <td><div style="font-weight:500">${esc(m.file)}</div><div class="muted mono">${fmt(m.size/1024)} kB${P.example?" · exemplo":""}</div></td>
+          <td style="min-width:200px"><select data-disc="${m.id}" aria-label="Disciplina">${discOpts(m.code)}</select></td>
+          <td class="num">${m.status==="pronto"?fmt(m.elems.length):"—"}</td>
+          <td style="font-size:12.5px">${(m.storeys||[]).map(s=>esc(s.name)).join(", ")||"—"}</td>
+          <td>${m.status==="pronto"?'<span class="chip ok">Lido</span>'+(m.skipped&&Object.keys(m.skipped).length?`<div class="muted" style="font-size:12px;margin-top:4px" title="Entidades que o leitor não conseguiu interpretar e pulou">Ignorados: ${Object.entries(m.skipped).map(([k,n])=>esc(k)+" ("+n+")").join(", ")}</div>`:"")+(m.schema?`<div class="muted mono" style="margin-top:2px">${esc(m.schema)}</div>`:""):m.status==="erro"?`<span class="chip P1" title="${esc(m.error)}">Erro</span> <span class="muted" style="font-size:12px">${esc(m.error)}</span>`:`<div class="prog"><i style="width:${Math.max(8,m.progress*100)}%"></i></div>`}</td>
+          <td class="tight"><input type="checkbox" data-vis="${m.id}" ${m.visible?"checked":""} aria-label="Visível"></td>
+          <td class="tight"><button class="btn small ghost" data-rm-model="${m.id}">Remover</button></td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="empty">Nenhum modelo neste projeto ainda.</div>`}
+    </div>
+  </section>`;
+}
+
+/* ---------- 3. Visualizador ---------- */
+function viewVisualizador(){
+  return `<section class="view full"><div class="vlayout">
+    <aside class="vside left"><div class="hd"><h2>Modelos e pavimentos</h2></div><div id="tree"></div></aside>
+    <div class="slot" id="vslot"></div>
+    <aside class="vside right"><div id="props"></div></aside>
+  </div></section>`;
+}
+function renderTree(){
+  const P=proj();const ms=(S.models[P.id]||[]).filter(m=>m.status==="pronto");const host=$("#tree");if(!host) return;
+  if(!ms.length){host.innerHTML=`<div class="empty" style="margin:12px">Nenhum modelo carregado. <button class="btn small" data-nav="modelos" style="margin-top:8px">Enviar IFC</button></div>`;return}
+  const open=S.ui.treeOpen;
+  host.innerHTML=`<ul class="tree">${ms.map(m=>{
+    const byStorey=new Map();for(const i of m.elems){const e=ELEMS[i];const s=byStorey.get(e.storey)||new Map();const k=e.cls;s.set(k,[...(s.get(k)||[]),i]);byStorey.set(e.storey,s)}
+    const order=[...byStorey.keys()].sort((a,b)=>levelRank(a)-levelRank(b));
+    const mk=m.id;const mo=open[mk]!==false;
+    return `<li class="model"><div class="node" data-toggle="${mk}"><span class="caret">${mo?"▾":"▸"}</span><input type="checkbox" data-vis="${m.id}" ${m.visible?"checked":""} aria-label="Visível"><span class="lbl" title="${esc(m.file)}">${esc(m.code||"?")} · ${esc(m.file)}</span><span class="ct">${m.elems.length}</span></div>
+      ${mo?`<ul>${order.map(st=>{const sk=mk+"|"+st;const so=open[sk]===true;const groups=byStorey.get(st);const all=[...groups.values()].flat();
+        return `<li><div class="node" data-toggle="${esc(sk)}"><span class="caret">${so?"▾":"▸"}</span><span class="lbl">${esc(st)}</span><span class="ct">${all.length}</span><button class="btn small ghost" data-sel="${all.join(",")}" title="Selecionar pavimento" style="padding:0 4px">◎</button></div>
+        ${so?`<ul>${[...groups.entries()].sort((a,b)=>entityName(a[0]).localeCompare(entityName(b[0]))).map(([cls,ids])=>`<li><div class="node" data-sel="${ids.join(",")}"><span class="caret"></span><span class="lbl" title="${esc(ifcPretty(cls))}">${esc(entityName(cls))}</span><span class="ct">${ids.length}</span></div></li>`).join("")}</ul>`:""}</li>`}).join("")}</ul>`:""}</li>`}).join("")}</ul>`;
+}
+function propsTable(rows){return `<table class="props"><tbody>${rows.filter(r=>r[1]!=null&&r[1]!=="").map(([k,v,cls])=>`<tr${k==="Entidade"?' class="hl"':""}><td>${esc(k)}</td><td class="${cls||""}">${esc(v)}</td></tr>`).join("")}</tbody></table>`}
+function renderProps(){
+  const host=$("#props");if(!host) return;
+  const sel=V.sel||[];
+  if(!sel.length){host.innerHTML=`<div class="hd"><h2>Propriedades do elemento</h2></div><div class="empty" style="margin:14px">Clique em um elemento no modelo 3D para ver as propriedades e os PropertySets.</div>`;return}
+  if(sel.length>1){
+    const counts={};for(const i of sel){const n=entityName(ELEMS[i].cls);counts[n]=(counts[n]||0)+1}
+    host.innerHTML=`<div class="hd"><h2>${sel.length} elementos selecionados</h2><div class="row" style="margin-top:8px"><button class="btn small" data-act2="isolate">Isolar</button><button class="btn small" data-act2="fit">Aproximar</button></div></div>
+      <table class="props"><tbody>${Object.entries(counts).map(([k,n])=>`<tr><td>${esc(k)}</td><td class="num">${n}</td></tr>`).join("")}</tbody></table>`;return;
+  }
+  const el=ELEMS[sel[0]];const tab=S.ui.propTab;
+  let body="";
+  if(tab==="geral"){
+    body=`<table class="props"><tbody><tr class="grp"><td colspan="2">Modelo BIM</td></tr></tbody></table>${propsTable(visusFields(el))}
+      <table class="props"><tbody><tr class="grp"><td colspan="2">Identificação IFC</td></tr></tbody></table>${propsTable(extraFields(el))}`;
+  }else{
+    const ps=psetsOf(el);
+    body=ps.length?ps.map((p,pi)=>`<details class="pset" open><summary>${esc(p.name)} <span class="muted">${p.fromType?"· do tipo":""}${p.qto?" · quantitativos":""} · ${p.props.length}</span></summary>
+      <table class="props"><tbody>${p.props.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)} <button class="fx" title="Criar filtro: ignorar elementos com ${esc(p.name)}.${esc(k)} = ${esc(v)}" data-mkfilter="${esc(JSON.stringify([p.name,k,v]))}">⊘ filtrar</button></td></tr>`).join("")}</tbody></table></details>`).join("")
+      :`<div class="empty" style="margin:14px">Este elemento não tem PropertySets.</div>`;
+  }
+  host.innerHTML=`<div class="hd"><div style="font-weight:600">${esc(entityName(el.cls))}</div><div class="muted" style="font-size:12.5px">${esc(el.name||el.typeName)} · ${esc(el.storey)}</div>
+    <div class="row" style="margin-top:8px"><button class="btn small" data-act2="isolate">Isolar</button><button class="btn small" data-act2="fit">Aproximar</button></div></div>
+    <div class="tabs" role="tablist"><button role="tab" data-ptab="geral" aria-selected="${tab==="geral"}">Geral</button><button role="tab" data-ptab="psets" aria-selected="${tab==="psets"}">PropertySets</button></div>${body}`;
+}
+
+/* ---------- 4. Regras ---------- */
+function viewRegras(){
+  const P=proj();
+  const groupOpts=(cur)=>Object.entries(GROUPS).map(([k,v])=>`<option value="${k}" ${k===cur?"selected":""}>${v}</option>`).join("");
+  const loadedClasses=[...new Set((S.models[P.id]||[]).flatMap(m=>m.elems.map(i=>ELEMS[i].cls)))].sort((a,b)=>entityName(a).localeCompare(entityName(b)));
+  const psetNames=[...new Set((S.models[P.id]||[]).flatMap(m=>m.elems.slice(0,4000).flatMap(i=>psetsOf(ELEMS[i]).map(p=>p.name))))].sort();
+  return `<section class="view stack">
+    <div><h1>Regras de análise</h1><p class="lede">Matriz de tolerância do Manual Corporativo de Clash Detection, filtros por entidade e PropertySet e as regras de pré-classificação. Alterações valem na próxima execução da análise.</p></div>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2>Matriz de tolerância</h2><div class="row"><button class="btn small" id="addTest">+ Teste</button><button class="btn small primary" data-run>Executar análise</button></div></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th></th><th>Ordem</th><th>Disciplina A</th><th></th><th>Disciplina B</th><th>Tipo</th><th>Tolerância (mm)</th><th>Fonte</th><th>Justificativa</th></tr></thead>
+        <tbody>${P.tests.sort((a,b)=>a.ordem-b.ordem).map(t=>`<tr data-test="${t.id}">
+          <td class="tight"><input type="checkbox" data-tf="on" ${t.on?"checked":""} aria-label="Ativo"></td>
+          <td class="num tight">${t.ordem}</td>
+          <td><select data-tf="a">${groupOpts(t.a)}</select></td><td class="muted tight">×</td>
+          <td><select data-tf="b">${groupOpts(t.b)}</select></td>
+          <td><select data-tf="kind"><option value="hard" ${t.kind==="hard"?"selected":""}>Interferência</option><option value="clearance" ${t.kind==="clearance"?"selected":""}>Folga</option></select></td>
+          <td style="width:110px"><input type="number" min="0" step="1" data-tf="tol" value="${t.tol}" aria-label="Tolerância"></td>
+          <td style="font-size:12.5px">${esc(t.fonte||"Projeto")}</td><td style="font-size:12.5px">${esc(t.just||"")}</td></tr>`).join("")}</tbody></table></div>
+      <p class="muted" style="font-size:12.5px;margin:10px 0 0"><b>Interferência:</b> conta quando a penetração passa da tolerância (abaixo dela é tolerável, P4 do manual). <b>Folga:</b> conta quando a distância entre os elementos é menor que a tolerância.</p>
+    </div>
+
+    <div class="grid2">
+      <div class="panel stack">
+        <div class="row" style="justify-content:space-between"><h2>Filtros de exclusão</h2><button class="btn small" id="addFilter">+ Filtro</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0">Elementos que atendem a um filtro ativo ficam fora da análise. Também dá para criar um filtro direto do painel de PropertySets no visualizador.</p>
+        ${P.filters.length?P.filters.map(f=>`<div class="row" data-filter="${f.id}" style="gap:6px;padding:8px;border:1px solid var(--line);border-radius:6px">
+          <input type="checkbox" data-ff="on" ${f.on?"checked":""} aria-label="Ativo">
+          <select data-ff="kind" style="width:120px"><option value="prop" ${f.kind==="prop"?"selected":""}>PropertySet</option><option value="entity" ${f.kind==="entity"?"selected":""}>Entidade</option></select>
+          ${f.kind==="entity"?`<select data-ff="cls" style="flex:1">${(loadedClasses.length?loadedClasses:Object.keys(DEFAULT_ENTITY_NAMES)).map(c=>`<option value="${c}" ${c===f.cls?"selected":""}>${esc(entityName(c))} (${esc(ifcPretty(c))})</option>`).join("")}</select>`
+          :`<input type="text" list="psetList" data-ff="pset" value="${esc(f.pset||"")}" placeholder="PropertySet" style="flex:1 1 130px">
+            <input type="text" data-ff="prop" value="${esc(f.prop||"")}" placeholder="Propriedade" style="flex:1 1 100px">
+            <select data-ff="op" style="width:84px">${["=","≠","contém","existe"].map(o=>`<option ${o===f.op?"selected":""}>${o}</option>`).join("")}</select>
+            ${f.op==="existe"?"":`<input type="text" data-ff="value" value="${esc(f.value??"")}" placeholder="Valor" style="flex:1 1 90px">`}`}
+          <button class="btn small ghost" data-rm-filter="${f.id}">Remover</button></div>`).join(""):`<div class="empty">Nenhum filtro.</div>`}
+        <datalist id="psetList">${psetNames.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+        <div style="font-size:12.5px"><span class="muted">Sempre excluídos:</span> ${P.excluded.map(c=>`<span class="chip outline">${esc(entityName(c))}</span>`).join(" ")}</div>
+      </div>
+
+      <div class="panel stack">
+        <h2>Responsável sugerido</h2>
+        <p class="muted" style="font-size:12.5px;margin:0">Em cada clash, a disciplina mais à direita da lista é a que se adapta e recebe o item. A pessoa é encontrada pelos códigos cadastrados na equipe.</p>
+        <div class="row" style="gap:6px">${P.flexOrder.map((c,i)=>`<span class="chip outline" style="gap:2px">${i?`<button class="btn small ghost" style="padding:0 2px" data-flex="${i}" data-dir="-1" aria-label="Mover ${c} para a esquerda">‹</button>`:""}<b>${esc(c)}</b>${i<P.flexOrder.length-1?`<button class="btn small ghost" style="padding:0 2px" data-flex="${i}" data-dir="1" aria-label="Mover ${c} para a direita">›</button>`:""}</span>`).join("")}</div>
+        <div class="muted" style="font-size:12px">Mais rígida → mais flexível. Ex.: em EST × SAN, o projetista de SAN recebe o clash.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Regras de pré-classificação</h2>
+      <p class="muted" style="font-size:12.5px;margin:0 0 10px">Avaliadas de cima para baixo; a primeira que se aplica define a sugestão. Baseadas nos critérios P1–P4 e INFO do manual e no padrão do seu BCF. Toda sugestão passa pela sua revisão.</p>
+      <div class="tbl-wrap"><table><thead><tr><th></th><th>Condição</th><th>Sugere</th><th>Motivo exibido ao coordenador</th></tr></thead>
+      <tbody>${RULES.map(r=>{const cfg=P.rules[r.id]||{on:true,cls:r.cls};return `<tr data-rule="${r.id}"><td class="tight"><input type="checkbox" data-rf="on" ${cfg.on?"checked":""} ${r.id==="r_def"?"disabled":""} aria-label="Ativa"></td>
+        <td>${esc(r.cond)}</td><td style="width:150px"><select data-rf="cls">${CLS_ORDER.map(k=>`<option value="${k}" ${k===cfg.cls?"selected":""}>${CLASSES[k].label}</option>`).join("")}</select></td><td style="font-size:12.5px" class="muted">${esc(r.reason)}</td></tr>`}).join("")}</tbody></table></div>
+    </div>
+
+    <div class="panel">
+      <h2>Entidade (padrão Visus)</h2>
+      <p class="muted" style="font-size:12.5px;margin:0 0 10px">O campo <b>Entidade</b> mostra o nome em português da classe IFC, como no Visus Cost Management (IfcPipeSegment → Segmento de tubulação). Corrija aqui qualquer nome que esteja diferente do Visus.</p>
+      <div class="tbl-wrap" style="max-height:340px;overflow:auto"><table><thead><tr><th>Classe IFC</th><th>Entidade exibida</th></tr></thead><tbody>
+        ${[...new Set([...loadedClasses,...Object.keys(DEFAULT_ENTITY_NAMES)])].map(c=>`<tr><td class="mono">${esc(ifcPretty(c))}</td><td><input type="text" data-ent="${c}" value="${esc(entityName(c))}" aria-label="Entidade para ${esc(c)}"></td></tr>`).join("")}
+      </tbody></table></div>
+    </div>
+  </section>`;
+}
+
+/* ---------- 5. Clashes por nível ---------- */
+function viewClashes(){
+  const P=proj();const cl=currentClashes();const run=S.lastRun[P.id];
+  const tab=S.ui.clashTab;
+  const real=cl.filter(c=>c.cls!=="FALSO"),fake=cl.filter(c=>c.cls==="FALSO");
+  const list=tab==="real"?real:fake;
+  const pend=cl.filter(c=>c.state!=="validado").length;
+  const levels=new Map();for(const c of list){(levels.get(c.level)||levels.set(c.level,[]).get(c.level)).push(c)}
+  const lvOrder=[...levels.keys()].sort((a,b)=>levelRank(a)-levelRank(b));
+  return `<section class="view stack">
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Clashes por nível</h1><p class="lede" style="margin:0">${run?`Última análise em ${dateBR(run.date)} · ${run.tests} testes · ${fmt(run.pool)} de ${fmt(run.elements)} elementos analisados · ${run.ms} ms`:"A análise ainda não foi executada neste projeto."}</p></div>
+      <button class="btn primary" data-run>Executar análise</button>
+    </div>
+    ${pend?`<div class="alert"><div class="grow"><b class="num">${pend} clashes foram pré-classificados automaticamente.</b> Revise a classificação antes de emitir os BCFs.</div><button class="btn accent" data-nav="revisao">Revisar um por um</button></div>`:""}
+    ${run?`<div class="row" style="justify-content:space-between">
+      <div class="seg" role="group"><button data-ctab="real" aria-pressed="${tab==="real"}">A corrigir <span class="num">(${real.length})</span></button><button data-ctab="fake" aria-pressed="${tab==="fake"}">Falsos clashes <span class="num">(${fake.length})</span></button></div>
+      <div class="muted" style="font-size:12.5px">${run.excluded.length?`${run.excluded.length} elementos excluídos por filtro · `:""}${run.below?`${run.below} interferências abaixo da tolerância ignoradas · `:""}${run.rejected?`${run.rejected} contatos só de caixa descartados pela geometria real`:""}</div></div>`:""}
+    ${!run?`<div class="empty">Configure os testes em <b>Regras de análise</b> e clique em <b>Executar análise</b>.</div>`:
+      !list.length?`<div class="empty">${tab==="real"?"Nenhum clash a corrigir.":"Nenhum falso clash identificado."}</div>`:
+      lvOrder.map(lv=>{const items=levels.get(lv);const counts=CLS_ORDER.map(k=>[k,items.filter(c=>c.cls===k).length]).filter(x=>x[1]);
+      return `<details class="lvl" open><summary><span class="name">${esc(lv)}</span><span class="count num">${items.length} ${items.length===1?"clash":"clashes"}</span><span class="chips">${counts.map(([k,n])=>`<span class="chip ${k}">${k==="FALSO"?"Falso":k} · ${n}</span>`).join("")}</span></summary>
+        <div class="tbl-wrap"><table><thead><tr><th>Título</th><th>Teste</th><th>Elemento A</th><th>Elemento B</th><th>${tab==="real"?"Penetração / folga":"Valor"}</th><th>Classificação</th><th>Responsável</th><th>Situação</th></tr></thead>
+        <tbody>${items.map(c=>{const A=ELEMS[c.a],B=ELEMS[c.b];return `<tr class="click" data-open-clash="${esc(c.id)}">
+          <td class="mono">${esc(c.title)}</td><td style="font-size:12.5px">${esc(c.testName)}</td>
+          <td>${esc(entityName(A.cls))}<div class="muted" style="font-size:12px">${esc(A.code)} · ${esc(A.name)}</div></td>
+          <td>${esc(entityName(B.cls))}<div class="muted" style="font-size:12px">${esc(B.code)} · ${esc(B.name)}</div></td>
+          <td class="num">${c.kind==="hard"?fmt(c.value,1)+" mm":"folga "+fmt(c.value,1)+" mm"}<div class="muted" style="font-size:12px">tol. ${c.tol} mm</div></td>
+          <td><span class="chip ${c.cls}">${CLASSES[c.cls].label}</span></td>
+          <td style="font-size:12.5px">${esc(c.resp?memberName(c.resp):"—")}</td>
+          <td>${c.state==="validado"?'<span class="chip ok">Validado</span>':'<span class="chip sug">Sugerido</span>'}</td></tr>`}).join("")}</tbody></table></div></details>`}).join("")}
+  </section>`;
+}
+
+/* ---------- 6. Revisão ---------- */
+function viewRevisao(){
+  return `<section class="view full"><div class="rlayout">
+    <aside class="vside left"><div class="hd"><h2>Fila de revisão</h2>
+      <div class="seg" style="margin-top:8px" role="group"><button data-rfilter="pendentes" aria-pressed="${S.ui.reviewFilter==="pendentes"}">Pendentes</button><button data-rfilter="todos" aria-pressed="${S.ui.reviewFilter==="todos"}">Todos</button><button data-rfilter="falsos" aria-pressed="${S.ui.reviewFilter==="falsos"}">Falsos</button></div></div>
+      <div id="queue"></div></aside>
+    <div class="slot" id="rslot"></div>
+    <aside class="vside right" id="rcard"></aside>
+  </div></section>`;
+}
+function queueItems(){
+  const f=S.ui.reviewFilter;const cl=currentClashes();
+  const items=f==="pendentes"?cl.filter(c=>c.state!=="validado"):f==="falsos"?cl.filter(c=>c.cls==="FALSO"):cl;
+  return [...items].sort((x,y)=>levelRank(x.level)-levelRank(y.level)||CLS_ORDER.indexOf(x.cls)-CLS_ORDER.indexOf(y.cls));
+}
+function renderQueue(){
+  const host=$("#queue");if(!host) return;const items=queueItems();
+  if(!currentClashes().length){host.innerHTML=`<div class="empty" style="margin:12px">Execute a análise para gerar a fila.<div style="margin-top:8px"><button class="btn small primary" data-run>Executar análise</button></div></div>`;return}
+  if(!items.length){host.innerHTML=`<div class="empty" style="margin:12px">${S.ui.reviewFilter==="pendentes"?"Tudo revisado. Os issues estão prontos para o BCF.":"Nada aqui."}</div>`;return}
+  let lv=null;
+  host.innerHTML=items.map(c=>{const h=c.level!==lv?`<div class="qgroup">${esc(c.level)}</div>`:"";lv=c.level;const A=ELEMS[c.a],B=ELEMS[c.b];
+    return h+`<div class="qitem ${S.ui.reviewSel===c.id?"sel":""}" data-q="${esc(c.id)}"><span class="chip ${c.cls}" style="min-width:44px;justify-content:center">${c.cls==="FALSO"?"Falso":c.cls}</span>
+      <div style="min-width:0"><div class="t mono">${esc(c.title)} ${c.state==="validado"?'<span style="color:var(--ok)">✓</span>':""}</div><div class="s">${esc(entityName(A.cls))} × ${esc(entityName(B.cls))}</div></div></div>`}).join("");
+}
+function renderReviewCard(refocus=false){
+  const host=$("#rcard");if(!host) return;
+  const items=queueItems();
+  let c=currentClashes().find(x=>x.id===S.ui.reviewSel);
+  if(!c||(refocus&&!items.includes(c)&&S.ui.reviewFilter==="pendentes")){c=items[0];S.ui.reviewSel=c?c.id:null;renderQueue()}
+  if(!c){host.innerHTML=`<div class="card"><div class="empty">Selecione um clash na fila.</div></div>`;V.pair=null;clearHL();clearIsolation();$("#vlegend").hidden=true;return}
+  if(refocus) focusClash(c);
+  const A=ELEMS[c.a],B=ELEMS[c.b],P=proj();
+  const sugg=c.suggested;const pos=items.indexOf(c);
+  const focusEl=V.pairFocus!=null?ELEMS[V.pairFocus]:null;
+  const elBox=(e,color,label)=>`<div class="elbox"><div class="hdr"><span class="sw" style="background:${color}"></span>${label} · ${esc(entityName(e.cls))}</div>
+    <div>${esc(e.name)}${e.typeName?` <span class="muted">· ${esc(e.typeName)}</span>`:""}</div>
+    <div class="muted">${esc(e.m.disc)} · ${esc(e.m.file)}</div><div class="mono muted">${esc(e.guid)}</div>
+    <div><button class="btn small ghost" style="padding:2px 0" data-pfocus="${e.idx}">${V.pairFocus===e.idx?"Ocultar PropertySets":"Ver PropertySets"}</button></div></div>`;
+  host.innerHTML=`<div class="card">
+    <div class="row" style="justify-content:space-between"><div><div class="mono" style="font-weight:600;font-size:15px">${esc(c.title)}</div><div class="muted" style="font-size:12.5px">${esc(c.level)} · ${esc(c.testName)}</div></div>
+      <div class="muted num" style="font-size:12px">${pos>=0?`${pos+1} de ${items.length}`:""}</div></div>
+    <div class="kv"><span>${c.kind==="hard"?"Penetração":"Folga"}</span><span class="num">${fmt(c.value,1)} mm <span class="muted">(tolerância ${c.tol} mm)</span></span>
+      <span>Sua decisão</span><span>${c.state==="validado"?`<span class="chip ${c.cls}">${CLASSES[c.cls].label}</span> <span class="chip ok">validado</span>`:'<span class="chip sug">aguardando revisão</span>'}</span>
+      <span>Sugestão do sistema</span><span><span class="chip ${sugg.cls}">${CLASSES[sugg.cls].label}</span>${c.state==="validado"&&c.cls!==sugg.cls?' <span class="muted" style="font-size:12px">você alterou</span>':""}</span></div>
+    <div class="reason"><b>Por quê:</b> ${esc(sugg.reason)}<div class="muted" style="margin-top:2px">Regra: ${esc(sugg.cond||"—")}</div></div>
+    ${elBox(A,"#e5322b","A")}${elBox(B,"#3f6fdb","B")}
+    ${focusEl?`<div style="border:1px solid var(--line);border-radius:6px;overflow:hidden"><div style="padding:6px 10px;font-weight:600;font-size:12.5px;background:var(--surface-2)">PropertySets · ${esc(entityName(focusEl.cls))}</div>
+      ${propsTable(visusFields(focusEl))}${psetsOf(focusEl).map(p=>`<details class="pset"><summary>${esc(p.name)} <span class="muted">· ${p.props.length}</span></summary>${propsTable(p.props)}</details>`).join("")}</div>`:""}
+    <div class="kv">
+      <span>Classificação</span><select id="rvCls">${CLS_ORDER.map(k=>`<option value="${k}" ${k===c.cls?"selected":""}>${CLASSES[k].label}${k===sugg.cls?" (sugerida)":""}</option>`).join("")}</select>
+      <span>Tipo (BCF)</span><select id="rvType">${["Clash","Fault","Issue","Request"].map(t=>`<option ${t===c.topicType?"selected":""}>${t}</option>`).join("")}</select>
+      <span>Responsável</span><select id="rvResp"><option value="">Sem responsável</option>${P.team.map(m=>`<option value="${m.id}" ${m.id===c.resp?"selected":""}>${esc(m.name)} — ${esc(m.role)}${m.id===c.respSuggested?" (sugerido)":""}</option>`).join("")}</select>
+      <span>Prazo</span><span style="font-size:13px">${esc(CLASSES[c.cls].prazo)} <span class="muted">· ${esc(CLASSES[c.cls].aceite)}</span></span>
+    </div>
+    <label class="fld">Comentário<textarea id="rvComment" rows="2" placeholder="Ex.: verificar com a estrutura se a viga pode ser furada"></textarea></label>
+    <div class="row">
+      <button class="btn primary" id="rvConfirm" title="Atalho: Enter">${c.state==="validado"?"Salvar alterações":"Confirmar e próximo"}</button>
+      ${c.cls!=="FALSO"?`<button class="btn" id="rvFake" title="Atalho: F">Marcar falso clash</button>`:""}
+      <button class="btn ghost" id="rvSkip" title="Atalho: →">Pular</button>
+    </div>
+    <div class="muted" style="font-size:12px"><kbd>Enter</kbd> confirma · <kbd>F</kbd> falso clash · <kbd>1</kbd>–<kbd>5</kbd> P1…INFO · <kbd>←</kbd><kbd>→</kbd> navega</div>
+    <div class="row" style="justify-content:space-between"><h2>Snapshots</h2><button class="btn small" data-act3="snap">Criar snapshot</button></div>
+    ${c.snapshots&&c.snapshots.length?`<div class="snaps">${c.snapshots.map(s=>`<img src="${s}" alt="Snapshot do clash ${esc(c.title)}">`).join("")}</div>`:`<div class="muted" style="font-size:12.5px">Nenhum snapshot ainda. O BCF usa o mais recente.</div>`}
+    ${(c.comments||[]).length?`<h2>Comentários</h2>${c.comments.map(m=>`<div class="cmt"><div class="muted" style="font-size:11.5px">${esc(m.author)} · ${dateBR(m.date)}</div>${esc(m.text)}</div>`).join("")}`:""}
+    <details><summary class="muted" style="font-size:12.5px;cursor:pointer">Histórico (${(c.history||[]).length})</summary>${(c.history||[]).map(h=>`<div class="cmt"><span class="muted" style="font-size:11.5px">${dateBR(h.date)}${h.by?" · "+esc(h.by):""}</span><br>${esc(h.text)}</div>`).join("")}</details>
+  </div>`;
+}
+function focusClash(c){
+  if(!c) return;
+  V.pair=[c.a,c.b];V.pairFocus=null;V.sel=[];clearHL();clearGroup(V.iso);
+  V.iso.add(subsetMesh([c.a],new THREE.Color("#e5322b"),{offset:-1}),subsetMesh([c.b],new THREE.Color("#3f6fdb"),{offset:-1}));setGhost(true);
+  const box=boxOf([c.a,c.b]);
+  const ib=new THREE.Box3().copy(ELEMS[c.a].box).intersect(ELEMS[c.b].box);
+  const focus=ib.isEmpty()?box:ib.expandByScalar(Math.max(0.8,ib.getSize(new THREE.Vector3()).length()));
+  fitView(focus.clone().union(new THREE.Box3().setFromCenterAndSize(focus.getCenter(new THREE.Vector3()),new THREE.Vector3(2.5,2.5,2.5))));
+  const lg=$("#vlegend");lg.hidden=false;
+  lg.innerHTML=`<div><i style="background:#e5322b"></i>A · ${esc(entityName(ELEMS[c.a].cls))}</div><div><i style="background:#3f6fdb"></i>B · ${esc(entityName(ELEMS[c.b].cls))}</div><div class="muted">${esc(c.level)}</div>`;
+  setStatus(`${c.title} · ${c.level}`);
+}
+function reviewAction(kind){
+  const c=currentClashes().find(x=>x.id===S.ui.reviewSel);if(!c) return;
+  const items=queueItems();const i=items.indexOf(c);
+  if(kind==="skip"){const n=items[i+1]||items[0];if(n){S.ui.reviewSel=n.id;renderQueue();renderReviewCard(true)}return}
+  if(kind==="prev"){const n=items[i-1];if(n){S.ui.reviewSel=n.id;renderQueue();renderReviewCard(true)}return}
+  const cls=kind==="fake"?"FALSO":$("#rvCls").value;
+  const resp=cls==="FALSO"?"":$("#rvResp").value;
+  const txt=($("#rvComment").value||"").trim();
+  if(txt) c.comments.push({date:new Date().toISOString(),author:coordinator().name,text:txt});
+  c.topicType=$("#rvType").value;
+  const wasPending=c.state!=="validado";
+  validate(c,{cls,resp});
+  const after=queueItems();
+  let next=null;
+  if(wasPending){next=after.find((x,k)=>k>=Math.max(0,i)&&x!==c&&x.state!=="validado")||after.find(x=>x.state!=="validado")}
+  S.ui.reviewSel=next?next.id:c.id;
+  renderNav();renderQueue();renderReviewCard(!!next);
+  if(wasPending) toast(cls==="FALSO"?"Marcado como falso clash.":`Validado: ${CLASSES[cls].label}${c.issueIndex?` · Issue #${c.issueIndex}`:""}`);
+  if(!pendingCount()&&wasPending) toast("Revisão concluída. Os issues estão prontos para o BCF 2.1.");
+}
+
+/* ---------- 7. Issues ---------- */
+const STATUS=["Aberto","Em andamento","Resolvido","Fechado","Reaberto"];
+function viewIssues(){
+  const cl=currentClashes().filter(c=>c.state==="validado"&&c.cls!=="FALSO").sort((a,b)=>a.issueIndex-b.issueIndex);
+  return `<section class="view stack">
+    <div><h1>Issues</h1><p class="lede">Clashes validados pelo coordenador viram issues com responsável, prazo do manual e histórico.</p></div>
+    ${pendingCount()?`<div class="alert"><div class="grow"><b class="num">${pendingCount()}</b> clashes ainda aguardam revisão e não aparecem aqui.</div><button class="btn accent" data-nav="revisao">Revisar</button></div>`:""}
+    <div class="panel">${cl.length?`<div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Título</th><th>Pavimento</th><th>Classificação</th><th>Elementos</th><th>Responsável</th><th>Prazo</th><th>Status</th><th>Criado</th></tr></thead><tbody>
+      ${cl.map(c=>{const A=ELEMS[c.a],B=ELEMS[c.b];const open=S.ui.issueOpen===c.id;return `<tr class="click" data-issue="${esc(c.id)}">
+        <td class="num mono">#${c.issueIndex}</td><td class="mono">${esc(c.title)}</td><td>${esc(c.level)}</td><td><span class="chip ${c.cls}">${CLASSES[c.cls].label}</span></td>
+        <td style="font-size:12.5px">${esc(ifcPretty(A.cls))} × ${esc(ifcPretty(B.cls))}</td><td style="font-size:12.5px">${esc(memberName(c.resp))}</td><td style="font-size:12.5px">${esc(CLASSES[c.cls].prazo)}</td>
+        <td style="min-width:140px"><select data-status="${esc(c.id)}" aria-label="Status">${STATUS.map(s=>`<option ${s===c.status?"selected":""}>${s}</option>`).join("")}</select></td>
+        <td style="font-size:12.5px" class="num">${c.created?dateBR(c.created):""}</td></tr>
+        ${open?`<tr><td colspan="9" style="background:var(--surface-2)"><div class="row" style="align-items:flex-start;gap:20px">
+          ${(c.snapshots||[]).slice(-1).map(s=>`<img src="${s}" alt="Snapshot" style="width:220px;border-radius:6px;border:1px solid var(--line)">`).join("")}
+          <div style="flex:1;min-width:240px;font-size:12.5px"><div><b>Motivo da classificação:</b> ${esc(c.suggested.reason)}</div>
+          <div class="mono muted" style="margin-top:4px">${esc(A.guid)} · ${esc(B.guid)}</div>
+          ${(c.comments||[]).map(m=>`<div class="cmt" style="margin-top:6px">${esc(m.author)}: ${esc(m.text)}</div>`).join("")}
+          <div style="margin-top:8px"><b>Histórico</b>${(c.history||[]).map(h=>`<div class="muted">${dateBR(h.date)} — ${esc(h.text)}</div>`).join("")}</div>
+          <div style="margin-top:8px"><button class="btn small" data-open-clash="${esc(c.id)}">Abrir na revisão 3D</button></div></div></div></td></tr>`:""}`}).join("")}</tbody></table></div>`
+      :`<div class="empty">Nenhum issue ainda. Valide os clashes na Revisão.</div>`}</div>
+  </section>`;
+}
+
+/* ---------- 8. BCF ---------- */
+function bcfMarkup(c){
+  const P=proj();const files=[...new Set([c.a,c.b].map(i=>ELEMS[i].m.file))];
+  const x=s=>esc(s);
+  const now=new Date().toISOString().replace(/\.\d+Z$/,"Z");
+  const comments=(c.comments||[]).map(m=>`  <Comment Guid="${uid()}">\n    <Date>${m.date.replace(/\.\d+Z$/,"Z")}</Date>\n    <Author>${x(coordinator().email||m.author)}</Author>\n    <Comment>${x(m.text)}</Comment>\n    <Viewpoint Guid="${c.vpGuid||(c.vpGuid=uid())}" />\n  </Comment>`).join("\n");
+  return `<?xml version="1.0" encoding="utf-8"?>
+<Markup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Header>
+${files.map(f=>`    <File>\n      <Filename>${x(f)}</Filename>\n    </File>`).join("\n")}
+  </Header>
+  <Topic Guid="${c.guid||(c.guid=uid())}" TopicType="${x(c.topicType||"Clash")}" TopicStatus="${c.status==="Fechado"?"Closed":c.status==="Resolvido"?"Done":"Open"}">
+    <Title>${x(c.title)}</Title>
+    <Priority>${x(CLASSES[c.cls].bcf)}</Priority>
+    <Index>${c.issueIndex}</Index>
+    <Labels>${x(c.level)}</Labels>
+    <CreationDate>${(c.created||now).replace(/\.\d+Z$/,"Z")}</CreationDate>
+    <CreationAuthor>${x(coordinator().email||coordinator().name)}</CreationAuthor>
+    <AssignedTo>${x(memberEmail(c.resp))}</AssignedTo>
+    <Description>${x(c.suggested.reason)}${c.comments&&c.comments.length?" "+x(c.comments[c.comments.length-1].text):""}</Description>
+  </Topic>
+${comments?comments+"\n":""}  <Viewpoints Guid="${c.vpGuid||(c.vpGuid=uid())}">
+    <Viewpoint>${c.vpGuid}.bcfv</Viewpoint>
+    <Snapshot>snapshot.png</Snapshot>
+  </Viewpoints>
+</Markup>`;
+}
+function bcfViewpoint(c){
+  const A=ELEMS[c.a],B=ELEMS[c.b];const vp=c.viewpoint||cameraViewpoint();
+  const xyz=(t,v)=>`    <${t}>\n      <X>${v[0]}</X>\n      <Y>${v[1]}</Y>\n      <Z>${v[2]}</Z>\n    </${t}>`;
+  return `<?xml version="1.0" encoding="utf-8"?>
+<VisualizationInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Guid="${c.vpGuid||(c.vpGuid=uid())}">
+  <Components>
+    <Selection>
+      <Component IfcGuid="${esc(A.guid)}" />
+      <Component IfcGuid="${esc(B.guid)}" />
+    </Selection>
+    <Visibility DefaultVisibility="true" />
+    <Coloring>
+      <Color Color="FFFC0D1B">
+        <Component IfcGuid="${esc(A.guid)}" />
+      </Color>
+      <Color Color="FF446DDE">
+        <Component IfcGuid="${esc(B.guid)}" />
+      </Color>
+    </Coloring>
+  </Components>
+  <PerspectiveCamera>
+${xyz("CameraViewPoint",vp.pos.map(v=>+v.toFixed(6)))}
+${xyz("CameraDirection",vp.dir.map(v=>+v.toFixed(6)))}
+${xyz("CameraUpVector",vp.up)}
+    <FieldOfView>${Math.round(vp.fov)}</FieldOfView>
+  </PerspectiveCamera>
+</VisualizationInfo>`;
+}
+function viewBcf(){
+  const issues=currentClashes().filter(c=>c.state==="validado"&&c.cls!=="FALSO").sort((a,b)=>a.issueIndex-b.issueIndex);
+  const fakes=currentClashes().filter(c=>c.cls==="FALSO").length;
+  const sel=issues.find(c=>c.id===S.ui.bcfSel)||issues[0];
+  const counts=CLS_ORDER.filter(k=>k!=="FALSO").map(k=>[k,issues.filter(c=>c.cls===k).length]);
+  return `<section class="view stack">
+    <div><h1>BCF 2.1</h1><p class="lede">Prévia do pacote BCF 2.1 no padrão de coordenação adotado: título por códigos de disciplina, prioridade "P2 - Alto", responsável por e-mail, componentes por GUID com cores A vermelho e B azul, câmera e snapshot.</p></div>
+    ${pendingCount()?`<div class="alert"><div class="grow"><b class="num">${pendingCount()} clashes ainda não foram revisados.</b> Eles ficam fora do BCF até você validar.</div><button class="btn accent" data-nav="revisao">Revisar</button></div>`:""}
+    <div class="grid2">
+      <div class="panel stack"><h2>O que entra no pacote</h2>
+        <div class="row">${counts.map(([k,n])=>`<span><span class="chip ${k}">${CLASSES[k].label}</span> <span class="num">${n}</span></span>`).join("")}</div>
+        <div style="font-size:13px"><b class="num">${issues.length}</b> issues validados · <span class="muted">${fakes} falsos clashes ficam fora</span></div>
+        <div style="font-size:13px" class="muted">Cada tópico leva: GUIDs dos elementos, viewpoint, snapshot, classificação (Priority), responsável (AssignedTo), comentários, pavimento (Labels) e metadados.</div>
+        <div class="row"><button class="btn primary" disabled title="Disponível na próxima etapa">Gerar arquivo .bcf</button><span class="muted" style="font-size:12.5px">A geração do arquivo para o Trimble Connect entra na próxima etapa; este painel de prévia não permite downloads.</span></div>
+      </div>
+      <div class="panel stack"><h2>Tópico</h2>
+        ${issues.length?`<select id="bcfSel" aria-label="Issue">${issues.map(c=>`<option value="${esc(c.id)}" ${c===sel?"selected":""}>#${c.issueIndex} · ${esc(c.title)} · ${esc(c.level)} · ${c.cls}</option>`).join("")}</select>
+        ${sel&&sel.snapshots&&sel.snapshots.length?`<img src="${sel.snapshots[sel.snapshots.length-1]}" alt="snapshot.png" style="max-width:100%;border-radius:6px;border:1px solid var(--line)">`:`<div class="muted" style="font-size:12.5px">Sem snapshot neste issue. Crie um na Revisão.</div>`}`:`<div class="empty">Nenhum issue validado.</div>`}
+      </div>
+    </div>
+    ${sel?`<div class="panel stack"><div class="row" style="justify-content:space-between"><h2>markup.bcf</h2><button class="btn small" data-copy="mk">Copiar XML</button></div><pre class="xml" id="xml-mk">${esc(bcfMarkup(sel))}</pre></div>
+    <div class="panel stack"><div class="row" style="justify-content:space-between"><h2>${esc(sel.vpGuid)}.bcfv</h2><button class="btn small" data-copy="vp">Copiar XML</button></div><pre class="xml" id="xml-vp">${esc(bcfViewpoint(sel))}</pre></div>`:""}
+  </section>`;
+}
+
+/* ===================================================================== */
+/*  Eventos                                                               */
+/* ===================================================================== */
+document.addEventListener("click",e=>{
+  const t=e.target;
+  const nav=t.closest("[data-nav]");if(nav){go(nav.dataset.nav);return}
+  if(t.closest("#reviewPill")){go("revisao");return}
+  if(t.closest("[data-run]")){toast("Analisando a geometria dos modelos…");setTimeout(()=>{runAnalysis();if(DB.view==="revisao"){renderQueue();renderReviewCard(true)}},60);return}
+  if(t.closest("#newProjectBtn")){const p={id:uid(),name:"Novo projeto",desc:"",team:[{id:uid(),name:"",role:"Coordenador BIM",codes:"",email:"",coord:true}],...defaultSettings()};DB.projects.push(p);switchProject(p.id);go("projeto");setTimeout(()=>$("#pName")?.select(),30);return}
+  if(t.closest("#delProject")){const P=proj();if(t.dataset.confirm!=="1"){t.dataset.confirm="1";t.textContent="Confirmar exclusão";return}DB.projects=DB.projects.filter(p=>p!==P);switchProject(DB.projects[0].id);return}
+  if(t.closest("#addMember")){proj().team.push({id:uid(),name:"",role:"",codes:"",email:""});save();renderAll();return}
+  const dm=t.closest("[data-del-member]");if(dm){const P=proj();P.team=P.team.filter(m=>m.id!==dm.dataset.delMember);save();renderAll();return}
+  if(t.closest("#drop")){$("#fileInput").click();return}
+  const rm=t.closest("[data-rm-model]");if(rm){removeModel(rm.dataset.rmModel);return}
+  // árvore
+  const tg=t.closest("[data-toggle]");if(tg&&!t.closest("input")&&!t.closest("[data-sel]")){const k=tg.dataset.toggle;const isModel=!k.includes("|");S.ui.treeOpen[k]=isModel?(S.ui.treeOpen[k]===false):!S.ui.treeOpen[k];renderTree();return}
+  const sl=t.closest("[data-sel]");if(sl){const ids=sl.dataset.sel.split(",").map(Number);selectElements(ids);fitView(boxOf(ids));document.querySelectorAll(".tree .node.sel").forEach(n=>n.classList.remove("sel"));sl.closest(".node")?.classList.add("sel");return}
+  const pt=t.closest("[data-ptab]");if(pt){S.ui.propTab=pt.dataset.ptab;renderProps();return}
+  const a2=t.closest("[data-act2]");if(a2){if(a2.dataset.act2==="isolate") isolate(V.sel); else fitView(boxOf(V.sel));return}
+  const mf=t.closest("[data-mkfilter]");if(mf){const [pset,prop,value]=JSON.parse(mf.dataset.mkfilter);proj().filters.push({id:uid(),on:true,kind:"prop",pset,prop,op:"=",value});save();toast(`Filtro criado: ignorar ${pset}.${prop} = ${value}. Ajuste em Regras de análise.`);return}
+  // regras
+  if(t.closest("#addTest")){const P=proj();const n=Math.max(0,...P.tests.map(x=>x.ordem))+1;P.tests.push({id:"t"+uid(),ordem:n,a:"EST",b:"MEP",tol:10,kind:"hard",fonte:"Projeto",just:"",on:true});save();renderAll();return}
+  if(t.closest("#addFilter")){proj().filters.push({id:uid(),on:true,kind:"prop",pset:"",prop:"",op:"=",value:""});save();renderAll();return}
+  const rf=t.closest("[data-rm-filter]");if(rf){const P=proj();P.filters=P.filters.filter(f=>f.id!==rf.dataset.rmFilter);save();renderAll();return}
+  const fl=t.closest("[data-flex]");if(fl){const P=proj();const i=+fl.dataset.flex,j=i+(+fl.dataset.dir);[P.flexOrder[i],P.flexOrder[j]]=[P.flexOrder[j],P.flexOrder[i]];save();renderAll();return}
+  // clashes
+  const ct=t.closest("[data-ctab]");if(ct){S.ui.clashTab=ct.dataset.ctab;renderAll();return}
+  const oc=t.closest("[data-open-clash]");if(oc){S.ui.reviewSel=oc.dataset.openClash;const c=currentClashes().find(x=>x.id===oc.dataset.openClash);if(c){S.ui.reviewFilter=c.cls==="FALSO"?"falsos":c.state==="validado"?"todos":"pendentes"}go("revisao");return}
+  // revisão
+  const rq=t.closest("[data-rfilter]");if(rq){S.ui.reviewFilter=rq.dataset.rfilter;renderAll();return}
+  const q=t.closest("[data-q]");if(q){S.ui.reviewSel=q.dataset.q;renderQueue();renderReviewCard(true);return}
+  if(t.closest("#rvConfirm")){reviewAction("confirm");return}
+  if(t.closest("#rvFake")){reviewAction("fake");return}
+  if(t.closest("#rvSkip")){reviewAction("skip");return}
+  const pf=t.closest("[data-pfocus]");if(pf){const i=+pf.dataset.pfocus;V.pairFocus=V.pairFocus===i?null:i;renderReviewCard();return}
+  if(t.closest("[data-act3]")){takeSnapshot();return}
+  // issues
+  const is=t.closest("[data-issue]");if(is&&!t.closest("select")){S.ui.issueOpen=S.ui.issueOpen===is.dataset.issue?null:is.dataset.issue;renderAll();return}
+  // bcf
+  const cp=t.closest("[data-copy]");if(cp){const txt=$("#xml-"+cp.dataset.copy).textContent;navigator.clipboard?.writeText(txt).then(()=>toast("XML copiado."),()=>{const r=document.createRange();r.selectNodeContents($("#xml-"+cp.dataset.copy));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("Texto selecionado — use Ctrl+C.")});return}
+});
+document.addEventListener("change",e=>{
+  const t=e.target;const P=proj();
+  if(t.id==="projectSelect"){switchProject(t.value);return}
+  if(t.id==="pName"){P.name=t.value.trim()||"Projeto sem nome";save();renderNav();return}
+  if(t.id==="pDesc"){P.desc=t.value;save();return}
+  const tr=t.closest("tr[data-mid]");if(tr){const m=P.team.find(x=>x.id===tr.dataset.mid);const f=t.dataset.f;if(f==="coord"){P.team.forEach(x=>x.coord=false);m.coord=true}else m[f]=t.value;save();reassignResp();return}
+  if(t.dataset.disc){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.disc);const code=t.value;m.code=code;m.disc=(CODE_INFO[code]||["A definir"])[0];m.group=(CODE_INFO[code]||[null,null])[1];for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}toast("Disciplina atualizada. Execute a análise de novo para aplicar.");return}
+  if(t.dataset.vis){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.vis);m.visible=t.checked;for(const c of m.chunks) c.visible=m.visible;V.dirty=true;return}
+  const tt=t.closest("tr[data-test]");if(tt){const x=P.tests.find(y=>y.id===tt.dataset.test);const f=t.dataset.tf;x[f]=f==="on"?t.checked:f==="tol"?Math.max(0,+t.value||0):t.value;save();return}
+  const ff=t.closest("[data-filter]");if(ff){const x=P.filters.find(y=>y.id===ff.dataset.filter);const f=t.dataset.ff;x[f]=f==="on"?t.checked:t.value;if(f==="kind"&&x.kind==="entity"&&!x.cls) x.cls=Object.keys(DEFAULT_ENTITY_NAMES)[0];save();if(f==="kind"||f==="op") renderAll();return}
+  const rr=t.closest("tr[data-rule]");if(rr){const id=rr.dataset.rule;const cfg=P.rules[id]||(P.rules[id]={on:true,cls:RULES.find(r=>r.id===id).cls});if(t.dataset.rf==="on") cfg.on=t.checked; else cfg.cls=t.value;save();return}
+  if(t.dataset.ent){P.entityNames[t.dataset.ent]=t.value.trim();save();return}
+  if(t.dataset.status){const c=currentClashes().find(x=>x.id===t.dataset.status);const old=c.status;c.status=t.value;logHist(c,`Status: ${old} → ${c.status}`);persistDecision(c);return}
+  if(t.id==="bcfSel"){S.ui.bcfSel=t.value;renderAll();return}
+  if(t.id==="fileInput"){handleFiles(t.files);t.value="";return}
+});
+document.addEventListener("keydown",e=>{
+  if(DB.view!=="revisao") return;
+  if(e.target.closest("input,textarea,select,button")){if(e.key==="Enter"&&e.target.id==="rvComment"&&(e.ctrlKey||e.metaKey)){reviewAction("confirm")}return}
+  if(e.key==="Enter"){e.preventDefault();reviewAction("confirm")}
+  else if(e.key==="f"||e.key==="F"){reviewAction("fake")}
+  else if(e.key==="ArrowRight"){reviewAction("skip")}
+  else if(e.key==="ArrowLeft"){reviewAction("prev")}
+  else if(/^[1-5]$/.test(e.key)){const s=$("#rvCls");if(s){s.value=CLS_ORDER[+e.key-1]}}
+});
+document.addEventListener("dragover",e=>{const d=e.target.closest?.("#drop");if(d){e.preventDefault();d.classList.add("over")}});
+document.addEventListener("dragleave",e=>{const d=e.target.closest?.("#drop");if(d) d.classList.remove("over")});
+document.addEventListener("drop",e=>{const d=e.target.closest?.("#drop");if(d){e.preventDefault();d.classList.remove("over");handleFiles(e.dataTransfer.files)}});
+document.addEventListener("keydown",e=>{if(e.target.id==="drop"&&(e.key==="Enter"||e.key===" ")){e.preventDefault();$("#fileInput").click()}});
+
+function reassignResp(){for(const c of currentClashes()){if(c.state!=="validado"){const r=responsible(c,proj());c.respSuggested=r.member;if(c.cls!=="FALSO") c.resp=r.member}}}
+async function handleFiles(files){
+  const P=proj();
+  for(const f of files){
+    if(!/\.ifc$/i.test(f.name)){toast(`${f.name} não é um arquivo .ifc.`);continue}
+    const buf=await f.arrayBuffer();
+    await loadIfc(P.id,f.name,buf);
+  }
+  toast("Modelos lidos. Execute a análise em Clashes por nível.");
+}
+function removeModel(id){
+  const P=proj();const list=S.models[P.id]||[];const m=list.find(x=>x.id===id);if(!m) return;
+  for(const c of m.chunks){V.root.remove(c);c.geometry.dispose();c.material.dispose()}
+  for(const i of m.elems) ELEMS[i].geoms=[];
+  try{if(m.mid!=null) api.CloseModel(m.mid)}catch(e){}
+  S.models[P.id]=list.filter(x=>x!==m);
+  S.clashes[P.id]=(S.clashes[P.id]||[]).filter(c=>ELEMS[c.a].model!==id&&ELEMS[c.b].model!==id);
+  selectElements([],{silent:true});V.dirty=true;renderAll();
+}
+function switchProject(id){
+  DB.current=id;save();V.pair=null;clearIsolation();selectElements([],{silent:true});attachProject(id);renderAll();setTimeout(()=>fitView(),50);
+  if(id==="exemplo"&&S.pendingExampleRun){S.pendingExampleRun=false;runAnalysis()}
+  setViewerMsg((S.models[id]||[]).length?"":"Nenhum modelo carregado neste projeto.");
+}
+
+/* ===================================================================== */
+/*  Início                                                                */
+/* ===================================================================== */
+const SAMPLES=["EXEMPLO-EST.ifc","EXEMPLO-ARQ.ifc","EXEMPLO-SAN.ifc","EXEMPLO-ELE.ifc","EXEMPLO-SCE.ifc","EXEMPLO-CLI.ifc"];
+async function loadSamples(){
+  setStatus("Lendo modelos de exemplo…");
+  for(const f of SAMPLES){
+    try{const r=await fetch("./exemplos/"+f);if(!r.ok) throw new Error(r.status);const b=await r.arrayBuffer();await loadIfc("exemplo",f,b)}
+    catch(e){console.error(e);toast(`Não foi possível ler ${f}.`)}
+  }
+  setStatus("Clique em um elemento para ver as propriedades.");
+  if(DB.current==="exemplo"){fitView();runAnalysis()} else S.pendingExampleRun=true;
+}
+initViewer();
+renderAll();
+setViewerMsg("");
+await initEngine();
+if(!engineError) await loadSamples();
+if(DB.current!=="exemplo") setViewerMsg((S.models[DB.current]||[]).length?"":"Nenhum modelo carregado neste projeto. Envie IFCs em Modelos IFC.");
+</script>
