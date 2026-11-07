@@ -1,6 +1,8 @@
 # COORDIX · Redesign "Industrial Precision"
 
 - **Branch:** `redesign/industrial-precision`, criada a partir da `main` no commit `dcd4139` (Fase 02 · Marco 1).
+- **Situação:** incorporado à `main` em 07/11/2026 (commit `a72ff80`). Backup da `main` anterior: `backup/main-2026-11-07-1800`.
+- **Símbolo:** proporção final LARG 0,68 · ALT 1,36 (em `ferramentas/gerar_simbolo.py`); na barra, a pupila fica entre as linhas COORDIX e BIMOFFICE (`--logo-mark-dy: -4px`).
 - **Escopo:** só apresentação. Nenhuma funcionalidade, regra, cálculo, id, classe usada pelo JS ou mecanismo de persistência foi removido ou renomeado.
 - **Fora do redesign:** o núcleo geométrico (`coordix-geometria.js`) e os testes não foram tocados (`git diff main -- coordix-geometria.js testes/` vazio).
 
