@@ -81,6 +81,7 @@ try{var t=localStorage.getItem("coordix.tema");if(t==="light"||t==="dark")docume
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:var(--fs-md)/1.45 var(--font);overflow:hidden;-webkit-font-smoothing:antialiased}
 *{box-sizing:border-box}
+[hidden]{display:none!important} /* componentes com display próprio (legenda, avisos) respeitam o atributo hidden */
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 ::selection{background:var(--accent-soft)}
