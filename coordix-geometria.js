@@ -46,6 +46,15 @@
     FAR_COORD: 5000,    // m — acima disso a visualização (Float32) perde precisão; a análise usa Float64
     MODEL_EXTENT_MIN: 0.1, // m — modelo inteiro menor que 10 cm: escala suspeita (possível conversão dupla)
     MODEL_EXTENT_MAX: 20000, // m — modelo inteiro maior que 20 km: escala suspeita
+    BVH: {
+      LEAF_SIZE: 4,     // triângulos por folha (máximo)
+      MAX_DEPTH: 48,    // profundidade máxima da árvore
+      METHOD: "mediana", // "mediana" (padrão: constrói ~3× mais rápido, consultas equivalentes — ver docs/fase-02-marco-01-bvh.md) ou "sah"
+      SAH_BINS: 12,     // compartimentos da SAH
+      MIN_TRIS: 32,     // abaixo disso as consultas usam varredura linear (mais rápida e idêntica)
+      LAZY_SCANS: 4,    // nº de consultas lineares por malha antes de construir a BVH (amortiza a construção
+                        // em pares baratos; 0 = construir na primeira consulta). Não altera resultados.
+    },
     LIMITS: {
       BB_EVALS: 8000,   // avaliações do ramo-e-limite para DECIDIR em relação à tolerância, por par
       BB_REFINE: 1500,  // avaliações extras para estreitar o intervalo da espessura depois de decidido
@@ -310,16 +319,133 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Consultas de malha (varredura linear — substituíveis por BVH)        */
+  /* BVH por malha (Fase 02 · Marco 1)                                    */
   /* ------------------------------------------------------------------ */
+  /**
+   * Árvore de volumes envolventes sobre as caixas dos triângulos de UMA malha.
+   * Construída uma única vez por malha (após GEO.BVH.LAZY_SCANS consultas lineares) e guardada em mesh._bvh.
+   * Referencia os triângulos por índice (perm), sem copiar a geometria.
+   *   boxes  Float64Array 6·nós    caixa de cada nó
+   *   left/right Int32Array        filhos (−1 = folha)
+   *   start/count Uint32Array      faixa de perm na folha
+   * Construção: eixo de maior extensão dos centroides; ponto de corte pela SAH com
+   * compartimentos (GEO.BVH.METHOD = "sah") ou pela mediana ("mediana").
+   */
+  const PERF = { bvhBuilds: 0, bvhBuildMs: 0, nodeVisits: 0, triTests: 0, linearTriTests: 0 };
+  function resetPerf() { for (const k in PERF) PERF[k] = 0; }
+  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+
+  function buildBVH(mesh, opt) {
+    const t0 = now();
+    const o = Object.assign({}, GEO.BVH, opt || {});
+    const n = mesh.n, tb = mesh.tb;
+    const perm = new Uint32Array(n); for (let i = 0; i < n; i++) perm[i] = i;
+    const cen = new Float64Array(n * 3);
+    for (let i = 0; i < n; i++) for (let d = 0; d < 3; d++) cen[i * 3 + d] = (tb[i * 6 + d] + tb[i * 6 + 3 + d]) / 2;
+    const B = [], L = [], R = [], S = [], C = [];
+    const area = (x0, y0, z0, x1, y1, z1) => { const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0; return dx * dy + dy * dz + dz * dx; };
+    // quickselect: perm[s..e) particionado de modo que perm[k] seja o k-ésimo pelo centroide no eixo ax
+    const select = (s, e, k, ax) => {
+      let lo = s, hi = e - 1;
+      while (lo < hi) {
+        const pv = cen[perm[(lo + hi) >> 1] * 3 + ax];
+        let i = lo, j = hi;
+        while (i <= j) {
+          while (cen[perm[i] * 3 + ax] < pv) i++;
+          while (cen[perm[j] * 3 + ax] > pv) j--;
+          if (i <= j) { const t = perm[i]; perm[i] = perm[j]; perm[j] = t; i++; j--; }
+        }
+        if (k <= j) hi = j; else if (k >= i) lo = i; else break;
+      }
+    };
+    const rec = (s, e, depth) => {
+      const id = L.length; L.push(-1); R.push(-1); S.push(s); C.push(e - s);
+      let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+      let cx0 = Infinity, cy0 = Infinity, cz0 = Infinity, cx1 = -Infinity, cy1 = -Infinity, cz1 = -Infinity;
+      for (let k = s; k < e; k++) {
+        const t = perm[k] * 6, c = perm[k] * 3;
+        if (tb[t] < x0) x0 = tb[t]; if (tb[t + 1] < y0) y0 = tb[t + 1]; if (tb[t + 2] < z0) z0 = tb[t + 2];
+        if (tb[t + 3] > x1) x1 = tb[t + 3]; if (tb[t + 4] > y1) y1 = tb[t + 4]; if (tb[t + 5] > z1) z1 = tb[t + 5];
+        if (cen[c] < cx0) cx0 = cen[c]; if (cen[c + 1] < cy0) cy0 = cen[c + 1]; if (cen[c + 2] < cz0) cz0 = cen[c + 2];
+        if (cen[c] > cx1) cx1 = cen[c]; if (cen[c + 1] > cy1) cy1 = cen[c + 1]; if (cen[c + 2] > cz1) cz1 = cen[c + 2];
+      }
+      B.push(x0, y0, z0, x1, y1, z1);
+      const cnt = e - s;
+      if (cnt <= o.LEAF_SIZE || depth >= o.MAX_DEPTH) return id;
+      const ext = [cx1 - cx0, cy1 - cy0, cz1 - cz0];
+      const ax = ext[0] >= ext[1] && ext[0] >= ext[2] ? 0 : ext[1] >= ext[2] ? 1 : 2;
+      if (!(ext[ax] > 0)) return id; // todos os centroides coincidem: não há corte útil
+      const c0 = [cx0, cy0, cz0][ax];
+      let mid = -1;
+      if (o.METHOD === "sah") {
+        const nb = o.SAH_BINS, bc = new Int32Array(nb), bb = new Float64Array(nb * 6);
+        for (let k = 0; k < nb; k++) { bb[k * 6] = bb[k * 6 + 1] = bb[k * 6 + 2] = Infinity; bb[k * 6 + 3] = bb[k * 6 + 4] = bb[k * 6 + 5] = -Infinity; }
+        const binOf = (c) => Math.min(nb - 1, Math.floor((c - c0) / ext[ax] * nb));
+        for (let k = s; k < e; k++) {
+          const i = perm[k], bi = binOf(cen[i * 3 + ax]); bc[bi]++;
+          for (let d = 0; d < 3; d++) { if (tb[i * 6 + d] < bb[bi * 6 + d]) bb[bi * 6 + d] = tb[i * 6 + d]; if (tb[i * 6 + 3 + d] > bb[bi * 6 + 3 + d]) bb[bi * 6 + 3 + d] = tb[i * 6 + 3 + d]; }
+        }
+        // custo de cada plano entre compartimentos: área(esq)·n(esq) + área(dir)·n(dir)
+        const la = new Float64Array(nb), ln = new Int32Array(nb);
+        let ax0 = Infinity, ay0 = Infinity, az0 = Infinity, ax1 = -Infinity, ay1 = -Infinity, az1 = -Infinity, acc = 0;
+        for (let k = 0; k < nb - 1; k++) {
+          if (bc[k]) { ax0 = Math.min(ax0, bb[k * 6]); ay0 = Math.min(ay0, bb[k * 6 + 1]); az0 = Math.min(az0, bb[k * 6 + 2]); ax1 = Math.max(ax1, bb[k * 6 + 3]); ay1 = Math.max(ay1, bb[k * 6 + 4]); az1 = Math.max(az1, bb[k * 6 + 5]); }
+          acc += bc[k]; ln[k] = acc; la[k] = acc ? area(ax0, ay0, az0, ax1, ay1, az1) : 0;
+        }
+        let best = Infinity, bestK = -1;
+        ax0 = ay0 = az0 = Infinity; ax1 = ay1 = az1 = -Infinity; acc = 0;
+        for (let k = nb - 1; k > 0; k--) {
+          if (bc[k]) { ax0 = Math.min(ax0, bb[k * 6]); ay0 = Math.min(ay0, bb[k * 6 + 1]); az0 = Math.min(az0, bb[k * 6 + 2]); ax1 = Math.max(ax1, bb[k * 6 + 3]); ay1 = Math.max(ay1, bb[k * 6 + 4]); az1 = Math.max(az1, bb[k * 6 + 5]); }
+          acc += bc[k];
+          const nl = ln[k - 1]; if (!nl || !acc) continue;
+          const cost = la[k - 1] * nl + area(ax0, ay0, az0, ax1, ay1, az1) * acc;
+          if (cost < best) { best = cost; bestK = k; }
+        }
+        if (bestK > 0) {
+          let i = s, j = e - 1;
+          while (i <= j) { if (binOf(cen[perm[i] * 3 + ax]) < bestK) i++; else { const t = perm[i]; perm[i] = perm[j]; perm[j] = t; j--; } }
+          mid = i;
+        }
+      }
+      if (mid <= s || mid >= e) { mid = (s + e) >> 1; select(s, e, mid, ax); }
+      const l = rec(s, mid, depth + 1), r = rec(mid, e, depth + 1);
+      L[id] = l; R[id] = r; C[id] = 0;
+      return id;
+    };
+    if (n) rec(0, n, 0);
+    const bvh = { boxes: Float64Array.from(B), left: Int32Array.from(L), right: Int32Array.from(R), start: Uint32Array.from(S), count: Uint32Array.from(C), perm, nodes: L.length, method: o.METHOD, leafSize: o.LEAF_SIZE };
+    bvh.bytes = bvh.boxes.byteLength + bvh.left.byteLength * 2 + bvh.start.byteLength * 2 + perm.byteLength;
+    PERF.bvhBuilds++; PERF.bvhBuildMs += now() - t0;
+    return bvh;
+  }
+  function bvhOf(mesh) {
+    if (mesh._bvh) return mesh._bvh;
+    if (!mesh.n || !mesh.tb || mesh.n < GEO.BVH.MIN_TRIS) return null;
+    mesh._scans = (mesh._scans || 0) + 1;
+    if (mesh._scans <= GEO.BVH.LAZY_SCANS) return null; // ainda compensa varrer linearmente
+    mesh._bvh = buildBVH(mesh);
+    return mesh._bvh;
+  }
+
+  /** Índices (em ordem crescente) dos triângulos cuja caixa toca a caixa B — mesmo conjunto e
+   *  mesma ordem da varredura linear, com o mesmo critério inclusivo de sobreposição. */
   function trianglesInBox(mesh, B) {
-    const out = [];
-    const tb = mesh.tb;
-    for (let i = 0; i < mesh.n; i++) {
-      const t = i * 6;
-      if (tb[t + 3] < B[0] || tb[t] > B[3] || tb[t + 4] < B[1] || tb[t + 1] > B[4] || tb[t + 5] < B[2] || tb[t + 2] > B[5]) continue;
-      out.push(i);
+    const tb = mesh.tb, bvh = bvhOf(mesh);
+    const hit = (t) => !(tb[t + 3] < B[0] || tb[t] > B[3] || tb[t + 4] < B[1] || tb[t + 1] > B[4] || tb[t + 5] < B[2] || tb[t + 2] > B[5]);
+    if (!bvh) {
+      const out = [];
+      for (let i = 0; i < mesh.n; i++) { PERF.linearTriTests++; if (hit(i * 6)) out.push(i); }
+      return out;
     }
+    const out = [], st = [0], nb = bvh.boxes;
+    while (st.length) {
+      const nd = st.pop(), o = nd * 6; PERF.nodeVisits++;
+      if (nb[o + 3] < B[0] || nb[o] > B[3] || nb[o + 4] < B[1] || nb[o + 1] > B[4] || nb[o + 5] < B[2] || nb[o + 2] > B[5]) continue;
+      if (bvh.left[nd] < 0) {
+        for (let k = bvh.start[nd], e = k + bvh.count[nd]; k < e; k++) { const i = bvh.perm[k]; PERF.triTests++; if (hit(i * 6)) out.push(i); }
+      } else { st.push(bvh.left[nd], bvh.right[nd]); }
+    }
+    out.sort((a, b) => a - b);
     return out;
   }
 
@@ -357,12 +483,34 @@
     return (px - rx) ** 2 + (py - ry) ** 2 + (pz - rz) ** 2;
   }
 
-  /** Distância (sem sinal) de p à superfície da malha. Exata (todas as faces, com poda por caixa). */
+  /** Distância (sem sinal) de p à superfície da malha. Exata: percorre a BVH do nó mais próximo
+   *  para o mais distante e descarta um nó só quando a distância à sua caixa é ≥ a melhor
+   *  distância já encontrada (nenhum triângulo dentro dele pode melhorar o resultado). */
   function unsignedDistance(mesh, x, y, z) {
-    const T = mesh.tris, tb = mesh.tb; let best = Infinity;
-    for (let i = 0; i < mesh.n; i++) {
-      if (pointBoxDist2(tb, i * 6, x, y, z) >= best) continue;
-      const d = ptTriDist2(x, y, z, T, i * 9); if (d < best) best = d;
+    const T = mesh.tris, tb = mesh.tb, bvh = bvhOf(mesh); let best = Infinity;
+    if (!bvh) {
+      for (let i = 0; i < mesh.n; i++) {
+        PERF.linearTriTests++;
+        if (pointBoxDist2(tb, i * 6, x, y, z) >= best) continue;
+        const d = ptTriDist2(x, y, z, T, i * 9); if (d < best) best = d;
+      }
+      return Math.sqrt(best);
+    }
+    const nb = bvh.boxes, st = [0];
+    while (st.length) {
+      const nd = st.pop(); PERF.nodeVisits++;
+      if (pointBoxDist2(nb, nd * 6, x, y, z) >= best) continue;
+      if (bvh.left[nd] < 0) {
+        for (let k = bvh.start[nd], e = k + bvh.count[nd]; k < e; k++) {
+          const i = bvh.perm[k]; PERF.triTests++;
+          if (pointBoxDist2(tb, i * 6, x, y, z) >= best) continue;
+          const d = ptTriDist2(x, y, z, T, i * 9); if (d < best) best = d;
+        }
+      } else {
+        const l = bvh.left[nd], r = bvh.right[nd];
+        const dl = pointBoxDist2(nb, l * 6, x, y, z), dr = pointBoxDist2(nb, r * 6, x, y, z);
+        if (dl <= dr) { st.push(r, l); } else { st.push(l, r); } // o mais próximo sai primeiro
+      }
     }
     return Math.sqrt(best);
   }
@@ -375,8 +523,21 @@
    */
   function windingNumber(mesh, x, y, z) {
     if (mesh.insideMode === "paridade") return parityInside(mesh, x, y, z);
+    // Sólido válido (fechado, 2-manifold, orientação consistente): o número de voltas vale
+    // exatamente 0 ou 1 e coincide com a paridade de cruzamentos de qualquer raio que não toque
+    // aresta, vértice nem plano paralelo. A paridade é calculada percorrendo a BVH (exata, sem
+    // aproximação por nós). Se os 3 raios forem degenerados, faz a soma completa abaixo.
+    if (mesh.topology === "solido_valido" && bvhOf(mesh)) {
+      for (const R of RAYS) { const p = rayParity(mesh, x, y, z, R, true); if (p >= 0) return p; }
+    }
+    return windingSum(mesh, x, y, z);
+  }
+  /** Soma completa dos ângulos sólidos (todas as faces) — usada em malhas abertas, malhas
+   *  pequenas e como recurso final; não descarta nenhuma contribuição. */
+  function windingSum(mesh, x, y, z) {
     const T = mesh.tris; let sum = 0;
     for (let o = 0; o < mesh.n * 9; o += 9) {
+      PERF.linearTriTests++;
       const ax = T[o] - x, ay = T[o + 1] - y, az = T[o + 2] - z;
       const bx = T[o + 3] - x, by = T[o + 4] - y, bz = T[o + 5] - z;
       const cx = T[o + 6] - x, cy = T[o + 7] - y, cz = T[o + 8] - z;
@@ -393,17 +554,47 @@
    * com orientação inconsistente), onde o número de voltas perde o sentido: a paridade não
    * depende da orientação das faces. Três raios em direções irracionais votam; retorna a
    * fração de raios com nº ímpar de cruzamentos (0, 1/3, 2/3 ou 1). Serve para ESTIMATIVA.
+   * Com BVH, só são testados os triângulos das folhas atravessadas pelo raio (caixas
+   * levemente ampliadas): os cruzamentos contados são os mesmos da varredura completa.
    */
   const RAYS = [[0.5773502691896258, 0.5773502691896257, 0.5773502691896259], [0.8017837257372732, -0.2672612419124244, 0.5345224838248488], [-0.2357022603955158, 0.9428090415820634, 0.2357022603955158]];
   function parityInside(mesh, x, y, z) {
-    const T = mesh.tris, b = mesh.box, L = 2 * Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) + 1;
     let odd = 0;
-    for (const [dx, dy, dz] of RAYS) {
-      let c = 0;
-      for (let o = 0; o < mesh.n * 9; o += 9) if (rayHit(x, y, z, dx * L, dy * L, dz * L, T, o)) c++;
-      if (c & 1) odd++;
-    }
+    for (const R of RAYS) if (rayParity(mesh, x, y, z, R, false) === 1) odd++;
     return odd / RAYS.length;
+  }
+  /** Paridade de cruzamentos do segmento p → p + R·L. robust=true: devolve −1 se o raio passar
+   *  rente a aresta/vértice ou paralelo a uma face atravessada (resultado não confiável). */
+  function rayParity(mesh, x, y, z, R, robust) {
+    const T = mesh.tris, b = mesh.box, Lr = 2 * Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) + 1;
+    const dx = R[0] * Lr, dy = R[1] * Lr, dz = R[2] * Lr;
+    const test = robust ? rayHitRobust : rayHit;
+    let c = 0;
+    const bvh = bvhOf(mesh);
+    if (!bvh) {
+      for (let o = 0; o < mesh.n * 9; o += 9) { PERF.linearTriTests++; const h = test(x, y, z, dx, dy, dz, T, o); if (h === 2) return -1; if (h) c++; }
+      return c & 1;
+    }
+    const nb = bvh.boxes, st = [0];
+    const ix = 1 / dx, iy = 1 / dy, iz = 1 / dz;
+    while (st.length) {
+      const nd = st.pop(), o6 = nd * 6; PERF.nodeVisits++;
+      // teste de lajes com caixa ampliada (tolerância relativa) — superconjunto dos triângulos atingíveis
+      const pad = 1e-9 * (1 + Math.abs(nb[o6]) + Math.abs(nb[o6 + 3]) + Math.abs(nb[o6 + 1]) + Math.abs(nb[o6 + 4]) + Math.abs(nb[o6 + 2]) + Math.abs(nb[o6 + 5]));
+      let t0 = 0, t1 = 1;
+      let ta = (nb[o6] - pad - x) * ix, tb2 = (nb[o6 + 3] + pad - x) * ix; if (ta > tb2) { const t = ta; ta = tb2; tb2 = t; } if (ta > t0) t0 = ta; if (tb2 < t1) t1 = tb2;
+      ta = (nb[o6 + 1] - pad - y) * iy; tb2 = (nb[o6 + 4] + pad - y) * iy; if (ta > tb2) { const t = ta; ta = tb2; tb2 = t; } if (ta > t0) t0 = ta; if (tb2 < t1) t1 = tb2;
+      ta = (nb[o6 + 2] - pad - z) * iz; tb2 = (nb[o6 + 5] + pad - z) * iz; if (ta > tb2) { const t = ta; ta = tb2; tb2 = t; } if (ta > t0) t0 = ta; if (tb2 < t1) t1 = tb2;
+      if (t0 > t1) continue;
+      if (bvh.left[nd] < 0) {
+        for (let k = bvh.start[nd], e = k + bvh.count[nd]; k < e; k++) {
+          PERF.triTests++;
+          const h = test(x, y, z, dx, dy, dz, T, bvh.perm[k] * 9);
+          if (h === 2) return -1; if (h) c++;
+        }
+      } else st.push(bvh.left[nd], bvh.right[nd]);
+    }
+    return c & 1;
   }
   function rayHit(px, py, pz, dx, dy, dz, T, o) { // Möller–Trumbore, segmento p → p+d
     const ax = T[o], ay = T[o + 1], az = T[o + 2];
@@ -415,6 +606,29 @@
     const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
     const v = (dx * qx + dy * qy + dz * qz) * inv; if (v < 0 || u + v > 1) return false;
     const t = (e2x * qx + e2y * qy + e2z * qz) * inv; return t > 0 && t <= 1;
+  }
+  /** Como rayHit, mas devolve 2 (degenerado) quando o raio passa a menos de 1e−9 (em coordenada
+   *  baricêntrica) de uma aresta ou vértice, ou é quase paralelo à face dentro do segmento. */
+  function rayHitRobust(px, py, pz, dx, dy, dz, T, o) {
+    const E = 1e-9;
+    const ax = T[o], ay = T[o + 1], az = T[o + 2];
+    const e1x = T[o + 3] - ax, e1y = T[o + 4] - ay, e1z = T[o + 5] - az, e2x = T[o + 6] - ax, e2y = T[o + 7] - ay, e2z = T[o + 8] - az;
+    const hx = dy * e2z - dz * e2y, hy = dz * e2x - dx * e2z, hz = dx * e2y - dy * e2x;
+    const det = e1x * hx + e1y * hy + e1z * hz;
+    const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    const scale = Math.hypot(nx, ny, nz) * Math.hypot(dx, dy, dz);
+    const sx = px - ax, sy = py - ay, sz = pz - az;
+    if (Math.abs(det) <= 1e-12 * scale) { // quase paralelo: degenerado só se o segmento estiver no plano da face
+      const dist = Math.abs(sx * nx + sy * ny + sz * nz) / (Math.hypot(nx, ny, nz) || 1);
+      return dist <= GEO.EPS_LEN ? 2 : 0;
+    }
+    const inv = 1 / det;
+    const u = (sx * hx + sy * hy + sz * hz) * inv; if (u < -E || u > 1 + E) return 0;
+    const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+    const v = (dx * qx + dy * qy + dz * qz) * inv; if (v < -E || u + v > 1 + E) return 0;
+    const t = (e2x * qx + e2y * qy + e2z * qz) * inv; if (t < -E || t > 1 + E) return 0;
+    if (u <= E || v <= E || u + v >= 1 - E || t <= E || t >= 1 - E) return 2;
+    return 1;
   }
 
   /** Distância com sinal (positiva dentro). ctx acumula classificações ambíguas. */
@@ -520,18 +734,85 @@
     return !(ta[a + 3] + pad < tb[b] || tb[b + 3] + pad < ta[a] || ta[a + 4] + pad < tb[b + 1] || tb[b + 4] + pad < ta[a + 1] || ta[a + 5] + pad < tb[b + 2] || tb[b + 5] + pad < ta[a + 2]);
   }
 
-  /** Busca exaustiva de cruzamento/contato entre as superfícies dentro da caixa B. */
+  /* Coleta, pela BVH de `mesh`, os triângulos cuja caixa sobrepõe a caixa do triângulo j da
+   * malha `src` ampliada por pad (mesmo critério de triBoxesOverlap). Resultado em out (ordem livre). */
+  function bvhOverlapTri(mesh, bvh, src, j, pad, out) {
+    const q = src.tb, b = j * 6, nb = bvh.boxes, tb = mesh.tb, st = [0];
+    out.length = 0;
+    while (st.length) {
+      const nd = st.pop(), o = nd * 6; PERF.nodeVisits++;
+      if (nb[o + 3] + pad < q[b] || q[b + 3] + pad < nb[o] || nb[o + 4] + pad < q[b + 1] || q[b + 4] + pad < nb[o + 1] || nb[o + 5] + pad < q[b + 2] || q[b + 5] + pad < nb[o + 2]) continue;
+      if (bvh.left[nd] < 0) {
+        for (let k = bvh.start[nd], e = k + bvh.count[nd]; k < e; k++) {
+          const i = bvh.perm[k], t = i * 6; PERF.triTests++;
+          if (!(tb[t + 3] + pad < q[b] || q[b + 3] + pad < tb[t] || tb[t + 4] + pad < q[b + 1] || q[b + 4] + pad < tb[t + 1] || tb[t + 5] + pad < q[b + 2] || q[b + 5] + pad < tb[t + 2])) out.push(i);
+        }
+      } else st.push(bvh.left[nd], bvh.right[nd]);
+    }
+    return out;
+  }
+  /* Coleta os triângulos de `mesh` cuja distância² caixa-a-caixa ao triângulo j de `src` é < r2.
+   * A distância de uma caixa de nó é ≤ à de qualquer triângulo contido nela: podar o nó é seguro. */
+  function bvhNearTri(mesh, bvh, src, j, r2, out) {
+    const q = src.tb, b = j * 6, nb = bvh.boxes, tb = mesh.tb, st = [0];
+    const gap2 = (T, o) => { let g = 0; for (let d = 0; d < 3; d++) { const x = Math.max(0, T[o + d] - q[b + d + 3], q[b + d] - T[o + d + 3]); g += x * x; } return g; };
+    out.length = 0;
+    while (st.length) {
+      const nd = st.pop(); PERF.nodeVisits++;
+      if (gap2(nb, nd * 6) >= r2) continue;
+      if (bvh.left[nd] < 0) {
+        for (let k = bvh.start[nd], e = k + bvh.count[nd]; k < e; k++) { const i = bvh.perm[k]; PERF.triTests++; if (gap2(tb, i * 6) < r2) out.push(i); }
+      } else st.push(bvh.left[nd], bvh.right[nd]);
+    }
+    return out;
+  }
+  const inBox = (tb, i, B) => { const t = i * 6; return !(tb[t + 3] < B[0] || tb[t] > B[3] || tb[t + 4] < B[1] || tb[t + 1] > B[4] || tb[t + 5] < B[2] || tb[t + 2] > B[5]); };
+  function lowerBound(arr, v) { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v) lo = m + 1; else hi = m; } return lo; }
+
+  /**
+   * Busca exaustiva de cruzamento/contato entre as superfícies dentro da caixa `box`.
+   * Semântica (idêntica à da Fase 01): os pares (i, j) são percorridos na ordem i crescente de A
+   * e j crescente de B entre os triângulos dentro de `box`; `pairs` conta os pares VIRTUAIS
+   * (todas as combinações ia × ib, testadas ou não) e o orçamento `limit` corta nessa contagem.
+   * Com BVH, para cada i só são examinados os j cujas caixas tocam a caixa de i (+EPS_LEN) —
+   * os demais seriam descartados por triBoxesOverlap na varredura linear. A ordem dos testes,
+   * o primeiro cruzamento/contato, o ponto e o corte por orçamento são os mesmos.
+   */
   function contactSearch(A, B, box, limit) {
     const ia = trianglesInBox(A, box), ib = trianglesInBox(B, box);
-    const res = { cross: false, touch: false, point: null, pairs: 0, truncated: false };
+    const res = { cross: false, touch: false, point: null, pairs: 0, truncated: false, tested: 0 };
     const pt = [0, 0, 0];
-    for (const i of ia) for (const j of ib) {
-      if (++res.pairs > limit) { res.truncated = true; return res; }
-      if (!triBoxesOverlap(A.tb, i, B.tb, j, GEO.EPS_LEN)) continue;
-      const r = triTriIntersect(A.tris, i * 9, B.tris, j * 9, pt);
-      if (r === CROSS) { res.cross = true; res.point = pt.slice(); return res; }
-      if (r === TOUCH && !res.touch) { res.touch = true; res.point = pt.slice(); }
+    const bvh = bvhOf(B), nb = ib.length;
+    if (!bvh || !ia.length || !nb) {
+      for (const i of ia) for (const j of ib) {
+        if (++res.pairs > limit) { res.truncated = true; return res; }
+        if (!triBoxesOverlap(A.tb, i, B.tb, j, GEO.EPS_LEN)) continue;
+        res.tested++;
+        const r = triTriIntersect(A.tris, i * 9, B.tris, j * 9, pt);
+        if (r === CROSS) { res.cross = true; res.point = pt.slice(); return res; }
+        if (r === TOUCH && !res.touch) { res.touch = true; res.point = pt.slice(); }
+      }
+      return res;
     }
+    const cand = [];
+    for (let r = 0; r < ia.length; r++) {
+      const i = ia[r], base = r * nb;
+      if (base + 1 > limit) { res.pairs = limit + 1; res.truncated = true; return res; }
+      bvhOverlapTri(B, bvh, A, i, GEO.EPS_LEN, cand);
+      cand.sort((x, y) => x - y);
+      for (const j of cand) {
+        if (!inBox(B.tb, j, box)) continue;
+        const v = base + lowerBound(ib, j) + 1; // índice virtual do par (i, j)
+        if (v > limit) { res.pairs = limit + 1; res.truncated = true; return res; }
+        res.tested++;
+        const t = triTriIntersect(A.tris, i * 9, B.tris, j * 9, pt);
+        if (t === CROSS) { res.cross = true; res.point = pt.slice(); res.pairs = v; return res; }
+        if (t === TOUCH && !res.touch) { res.touch = true; res.point = pt.slice(); }
+      }
+    }
+    const total = ia.length * nb;
+    if (total > limit) { res.pairs = limit + 1; res.truncated = true; return res; }
+    res.pairs = total;
     return res;
   }
 
@@ -574,24 +855,56 @@
   }
   /** Distância mínima entre as superfícies, considerando só faces que podem estar a menos
    *  de `reach` da outra peça (faces de A dentro da caixa de B alargada por reach, e vice-versa).
-   *  d = Infinity significa: nenhuma face a menos de reach (distância ≥ reach). */
+   *  d = Infinity significa: nenhuma face a menos de reach (distância ≥ reach).
+   *  Ordem, poda por caixa (g ≥ melhor), parada antecipada (stopAt) e orçamento em pares
+   *  virtuais são os da Fase 01. Com BVH, para cada i só são examinados os j com distância de
+   *  caixa < melhor atual; como o melhor só diminui, os j não examinados seriam podados na
+   *  varredura linear — a sequência de valores de `best`, o resultado e o corte são os mesmos. */
   function minDistance(A, B, reach, limit, stopAt) {
     const ex = (b, r) => [b[0] - r, b[1] - r, b[2] - r, b[3] + r, b[4] + r, b[5] + r];
-    const ia = trianglesInBox(A, ex(B.box, reach)), ib = trianglesInBox(B, ex(A.box, reach));
-    const res = { d: Infinity, pairs: 0, truncated: false };
+    const bx = ex(A.box, reach);
+    const ia = trianglesInBox(A, ex(B.box, reach)), ib = trianglesInBox(B, bx);
+    const res = { d: Infinity, pairs: 0, truncated: false, tested: 0 };
     let best = Infinity; const stop2 = stopAt * stopAt;
-    for (const i of ia) {
-      for (const j of ib) {
-        if (++res.pairs > limit) { res.truncated = true; res.d = Math.sqrt(best); return res; }
-        const ta = i * 6, tbb = j * 6;
+    const bvh = bvhOf(B), nb = ib.length;
+    if (!bvh || !ia.length || !nb) {
+      for (const i of ia) {
+        for (const j of ib) {
+          if (++res.pairs > limit) { res.truncated = true; res.d = Math.sqrt(best); return res; }
+          const ta = i * 6, tbb = j * 6;
+          let g = 0;
+          for (let d = 0; d < 3; d++) { const gg = Math.max(0, A.tb[ta + d] - B.tb[tbb + d + 3], B.tb[tbb + d] - A.tb[ta + d + 3]); g += gg * gg; }
+          if (g >= best) continue;
+          res.tested++;
+          const d2 = triTriDist2(A.tris, i * 9, B.tris, j * 9);
+          if (d2 < best) { best = d2; if (best <= stop2) { res.d = Math.sqrt(best); return res; } }
+        }
+      }
+      res.d = Math.sqrt(best);
+      return res;
+    }
+    const cand = [];
+    for (let r = 0; r < ia.length; r++) {
+      const i = ia[r], base = r * nb, ta = i * 6;
+      if (base + 1 > limit) { res.pairs = limit + 1; res.truncated = true; res.d = Math.sqrt(best); return res; }
+      if (best === Infinity) { cand.length = 0; for (const j of ib) cand.push(j); }
+      else { bvhNearTri(B, bvh, A, i, best, cand); cand.sort((x, y) => x - y); }
+      for (const j of cand) {
+        if (best !== Infinity && !inBox(B.tb, j, bx)) continue;
+        const v = base + lowerBound(ib, j) + 1;
+        if (v > limit) { res.pairs = limit + 1; res.truncated = true; res.d = Math.sqrt(best); return res; }
+        const tbb = j * 6;
         let g = 0;
         for (let d = 0; d < 3; d++) { const gg = Math.max(0, A.tb[ta + d] - B.tb[tbb + d + 3], B.tb[tbb + d] - A.tb[ta + d + 3]); g += gg * gg; }
         if (g >= best) continue;
+        res.tested++;
         const d2 = triTriDist2(A.tris, i * 9, B.tris, j * 9);
-        if (d2 < best) { best = d2; if (best <= stop2) { res.d = Math.sqrt(best); return res; } }
+        if (d2 < best) { best = d2; if (best <= stop2) { res.d = Math.sqrt(best); res.pairs = v; return res; } }
       }
     }
-    res.d = Math.sqrt(best);
+    const total = ia.length * nb;
+    if (total > limit) { res.pairs = limit + 1; res.truncated = true; res.d = Math.sqrt(best); return res; }
+    res.pairs = total; res.d = Math.sqrt(best);
     return res;
   }
 
@@ -1261,5 +1574,6 @@
     transformVertexData, unitScaleFor, resolveLengthUnit, checkScalePlausibility, detectReaderConversion, readElementGeometries,
     READER_CONVERTS_UNITS: true, // web-ifc 0.0.39: geometria já em metros (verificado; ver detectReaderConversion)
     selfOverlap, containmentPossible,
+    buildBVH, bvhOf, windingSum, parityInside, rayParity, PERF, resetPerf, // Fase 02 · Marco 1
   };
 });

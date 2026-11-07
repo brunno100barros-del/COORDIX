@@ -3,9 +3,14 @@
  * Cada cenário define o resultado esperado (estado e valores) e valida o obtido.
  * Sai com código 1 se algum cenário falhar. */
 "use strict";
-const G = require("../coordix-geometria.js");
+// COORDIX_NUCLEO=legado roda a mesma suíte no núcleo linear da Fase 01 (comparação de tempo)
+const G = require(process.env.COORDIX_NUCLEO === "legado" ? "./legado_fase01.js" : "../coordix-geometria.js");
 const F = require("./formas.js");
 const { STATE: S } = G;
+// Fase 02: permite rodar a suíte forçando a BVH em todas as malhas e escolhendo o método de corte
+if (G.GEO.BVH && process.env.COORDIX_BVH_MIN) G.GEO.BVH.MIN_TRIS = Number(process.env.COORDIX_BVH_MIN);
+if (G.GEO.BVH && process.env.COORDIX_BVH_METHOD) G.GEO.BVH.METHOD = process.env.COORDIX_BVH_METHOD;
+if (G.GEO.BVH && process.env.COORDIX_BVH_LAZY) G.GEO.BVH.LAZY_SCANS = Number(process.env.COORDIX_BVH_LAZY);
 
 const mesh = (...geoms) => G.prepareMesh(geoms);
 const mm = (m) => (m == null ? null : m * 1000);
