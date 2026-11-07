@@ -12,7 +12,7 @@ def dbez(p0,p1,p2,p3,t):
 import re
 # proporção do olho: LARG < 1 estreita, ALT > 1 abre (aplicadas aos pontos medidos, não às espessuras,
 # para que a íris continue circular e os traços mantenham o peso)
-LARG=0.80; ALT=1.20; CX0,CY0=32.0,37.0
+LARG=0.68; ALT=1.36; CX0,CY0=32.0,37.0
 def T(p): return (CX0+(p[0]-CX0)*LARG, CY0+(p[1]-CY0)*ALT)
 def TP(d): return re.sub(r"(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)", lambda m: P(T((float(m.group(1)),float(m.group(2))))), d)
 IN=T((7.4,40.6)); TOP=T((29.4,30.8)); OUT=T((57.0,37.4))
