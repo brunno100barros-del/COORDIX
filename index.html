@@ -99,7 +99,8 @@ html.theme-anim,html.theme-anim *,html.theme-anim *::before,html.theme-anim *::a
 /* barra superior: células separadas por fios, como o carimbo de uma prancha */
 .top{grid-column:1/-1;display:flex;align-items:stretch;background:var(--surface);border-bottom:var(--bw) solid var(--line-strong);min-width:0}
 .top > *{display:flex;align-items:center}
-.logo{width:var(--w-rail);flex:none;gap:10px;padding-inline:var(--sp-4);border-right:var(--bw) solid var(--line);color:var(--ink);
+.logo{--logo-mark-dy:-4px; /* pupila entre as linhas COORDIX e BIMOFFICE, um pouco mais perto de COORDIX */
+  width:var(--w-rail);flex:none;gap:10px;padding-inline:var(--sp-4);border-right:var(--bw) solid var(--line);color:var(--ink);
   font:700 18px/1 var(--font-cond);letter-spacing:.14em}
 .logo .logo-mark{width:44px;height:30px;flex:none;overflow:visible;margin-left:-2px;transform:translateY(var(--logo-mark-dy,0px))}
 .logo .logo-word{display:flex;flex-direction:column;gap:3px}
