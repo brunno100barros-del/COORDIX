@@ -1,4 +1,4 @@
-<title>BIMORA</title>
+<title>COORDIX</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -88,6 +88,8 @@ td.tight{width:1%;white-space:nowrap}
 .chip.outline{background:none;color:var(--muted);border:1px solid var(--line);font-weight:500}
 .chip.sug{background:none;border:1px dashed var(--accent);color:var(--ink);font-weight:500}
 .chip.ok{background:none;border:1px solid var(--ok);color:var(--ok);font-weight:500}
+.chip.geo{background:none;border:1px solid var(--p2);color:var(--ink);font-weight:500}
+.logo-sub{font:600 10px/1 var(--font);letter-spacing:.12em;color:var(--muted);margin-left:2px;align-self:flex-end;padding-bottom:2px}
 .sevbar{display:flex;height:10px;border-radius:3px;overflow:hidden;background:var(--surface-2)}
 .sevbar span{display:block;height:100%}
 
@@ -203,9 +205,9 @@ pre.xml{margin:0;padding:12px;background:var(--surface-2);border-radius:6px;over
 
 <div class="app" id="app">
   <header class="top">
-    <div class="logo" aria-label="BIMORA">
+    <div class="logo" aria-label="BIMOFFICE: COORDIX">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg>
-      BIMORA
+      COORDIX<span class="logo-sub">BIMOFFICE</span>
     </div>
     <div class="projsel">
       <select id="projectSelect" aria-label="Projeto"></select>
@@ -234,6 +236,7 @@ pre.xml{margin:0;padding:12px;background:var(--surface-2);border-radius:6px;over
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="coordix-geometria.js"></script>
 <script type="module">
 /* ===================================================================== */
 /*  Dados de referência (Manual Corporativo de Clash Detection + BCF)     */
@@ -356,7 +359,7 @@ function exampleProject(){
   return {
     id:"exemplo", example:true,
     name:"EDIFÍCIO EDUCACIONAL MODELO (exemplo)",
-    desc:"Projeto de demonstração com modelos IFC gerados pelo BIMORA com o código da disciplina no nome do arquivo (EXEMPLO-EST.ifc, EXEMPLO-SAN.ifc…). A equipe abaixo é fictícia — substitua pelos integrantes reais.",
+    desc:"Projeto de demonstração com modelos IFC gerados pelo COORDIX com o código da disciplina no nome do arquivo (EXEMPLO-EST.ifc, EXEMPLO-SAN.ifc…). A equipe abaixo é fictícia — substitua pelos integrantes reais.",
     team:[
       {id:uid(),name:"Coordenador(a) BIM",role:"Coordenador BIM",codes:"",email:"coordenacao@exemplo.com",coord:true},
       {id:uid(),name:"Ana Lima",role:"Projetista de Elétrica e Cabeamento",codes:"ELE, SCE, SPD, SUB",email:"ana.lima@exemplo.com"},
@@ -533,7 +536,7 @@ async function loadIfc(projectId, file, bytes){
 function indexModel(m){
   const mid=m.mid,T=WEBIFC;
   m.skipped=m.skipped||{};
-  const skip=(what,e)=>{m.skipped[what]=(m.skipped[what]||0)+1;if(m.skipped[what]===1) console.warn("BIMORA: "+what+" ignorado",e)};
+  const skip=(what,e)=>{m.skipped[what]=(m.skipped[what]||0)+1;if(m.skipped[what]===1) console.warn("COORDIX: "+what+" ignorado",e)};
   const ids=code=>{if(code==null) return [];try{return vec(api.GetLineIDsWithType(mid,code))}catch(e){skip("tipo "+code,e);return []}};
   const line=id=>api.GetLine(mid,id,false);
   const each=(code,label,fn)=>{for(const id of ids(code)){try{const l=line(id);if(l) fn(l,id)}catch(e){skip(label,e)}}};
@@ -561,6 +564,7 @@ function indexModel(m){
   m.stage="unidades";
   m.unitScale=1;
   each(T.IFCSIUNIT,"IfcSIUnit",l=>{if(val(l.UnitType)==="LENGTHUNIT"){m.unitPrefix=val(l.Prefix)||""}});
+  if(T.IFCCONVERSIONBASEDUNIT!=null) each(T.IFCCONVERSIONBASEDUNIT,"IfcConversionBasedUnit",l=>{if(val(l.UnitType)==="LENGTHUNIT") m.unitConv=decIfc(val(l.Name))||"convertida"});
 }
 function storeyOf(m,eid){
   let cur=eid;for(let i=0;i<12&&cur!=null;i++){
@@ -585,35 +589,37 @@ function buildGeometry(m){
       const g=api.GetGeometry(mid,pg.geometryExpressID);
       const vd=api.GetVertexArray(g.GetVertexData(),g.GetVertexDataSize());
       const id=api.GetIndexArray(g.GetIndexData(),g.GetIndexDataSize());
-      const t=pg.flatTransformation;const nv=vd.length/6;
-      const P=new Float32Array(nv*3),N=new Float32Array(nv*3);
-      for(let k=0;k<nv;k++){
-        const x=vd[k*6],y=vd[k*6+1],z=vd[k*6+2];
-        let X=t[0]*x+t[4]*y+t[8]*z+t[12],Y=t[1]*x+t[5]*y+t[9]*z+t[13],Z=t[2]*x+t[6]*y+t[10]*z+t[14];
-        if(!origin) origin=[X,Y,Z];
+      const t=pg.flatTransformation;
+      const {P:W,N}=GEOC.transformVertexData(vd,t); // posições mundiais em Float64, na unidade do arquivo
+      for(let k=0;k<W.length;k+=3){const X=W[k],Y=W[k+1],Z=W[k+2];
         if(X<rawMin[0])rawMin[0]=X;if(Y<rawMin[1])rawMin[1]=Y;if(Z<rawMin[2])rawMin[2]=Z;
         if(X>rawMax[0])rawMax[0]=X;if(Y>rawMax[1])rawMax[1]=Y;if(Z>rawMax[2])rawMax[2]=Z;
-        P[k*3]=X-origin[0];P[k*3+1]=Y-origin[1];P[k*3+2]=Z-origin[2];
-        const a=vd[k*6+3],b=vd[k*6+4],c=vd[k*6+5];
-        let nx=t[0]*a+t[4]*b+t[8]*c,ny=t[1]*a+t[5]*b+t[9]*c,nz=t[2]*a+t[6]*b+t[10]*c;const L=Math.hypot(nx,ny,nz)||1;
-        N[k*3]=nx/L;N[k*3+1]=ny/L;N[k*3+2]=nz/L;
-      }
+        if(!origin) origin=[X,Y,Z]}
       const c=pg.color;
-      const rec=perEl.get(eid)||{geoms:[]};rec.geoms.push({p:P,n:N,i:new Uint32Array(id),c:[c.x,c.y,c.z,c.w]});perEl.set(eid,rec);
+      const rec=perEl.get(eid)||{geoms:[]};rec.geoms.push({w:W,n:N,i:new Uint32Array(id),c:[c.x,c.y,c.z,c.w]});perEl.set(eid,rec);
       if(g.delete) try{g.delete()}catch(e){}
-     }catch(e){m.skipped=m.skipped||{};m.skipped["geometria"]=(m.skipped["geometria"]||0)+1;if(m.skipped["geometria"]===1) console.warn("BIMORA: geometria ignorada",e)}
+     }catch(e){m.skipped=m.skipped||{};m.skipped["geometria"]=(m.skipped["geometria"]||0)+1;if(m.skipped["geometria"]===1) console.warn("COORDIX: geometria ignorada",e)}
     }
   });
   m.stage="elementos";
   if(!origin){m.empty=true;return}
-  // unidade: se o arquivo está em milímetros e as coordenadas vieram sem conversão, converte para metros
+  // unidade → metros (centralizado no núcleo); coordenadas relativas à origem comum do projeto, em Float64
   const ext=Math.max(rawMax[0]-rawMin[0],rawMax[1]-rawMin[1],rawMax[2]-rawMin[2]);
-  let s=1;
-  if(m.unitPrefix==="MILLI"&&ext>1000) s=0.001; else if(m.unitPrefix==="CENTI"&&ext>1000) s=0.01;
-  m.unitScale=s;m.rawOrigin=origin;
+  const us=GEOC.unitScaleFor(m.unitPrefix,ext);let s=us.scale;
+  m.unitScale=s;m.unitInfo=us;m.rawOrigin=origin;m.geoFlags=m.geoFlags||[];
+  if(m.unitConv){m.unitUnsupported=true;m.geoFlags.push(`Unidade de comprimento ${m.unitConv} não suportada: resultados geométricos marcados como inconclusivos`)}
+  else if(us.unknown){m.unitUnsupported=true;m.geoFlags.push(`Prefixo de unidade desconhecido (${m.unitPrefix}): resultados geométricos marcados como inconclusivos`)}
+  else if(us.assumed&&m.unitPrefix) m.geoFlags.push(`Unidade ${m.unitPrefix==="MILLI"?"milímetro":m.unitPrefix}: geometria tratada como já convertida para metros (extensão ${fmt(ext,1)})`);
   const o=[origin[0]*s,origin[1]*s,origin[2]*s];
   if(!GLOBAL_OFFSET) GLOBAL_OFFSET=o.map(v=>Math.round(v));
-  const cx=o[0]-GLOBAL_OFFSET[0],cy=o[1]-GLOBAL_OFFSET[1],cz=o[2]-GLOBAL_OFFSET[2];
+  let farMax=0;
+  for(const rec of perEl.values()) for(const g of rec.geoms){
+    const W=g.w,P64=new Float64Array(W.length);
+    for(let k=0;k<W.length;k+=3){P64[k]=W[k]*s-GLOBAL_OFFSET[0];P64[k+1]=W[k+1]*s-GLOBAL_OFFSET[1];P64[k+2]=W[k+2]*s-GLOBAL_OFFSET[2];
+      const f=Math.max(Math.abs(P64[k]),Math.abs(P64[k+1]),Math.abs(P64[k+2]));if(f>farMax) farMax=f}
+    g.p64=P64;g.p=Float32Array.from(P64);delete g.w; // p (Float32) só para desenho e seleção; p64 para a análise
+  }
+  if(farMax>GEOC.GEO.FAR_COORD) m.geoFlags.push(`Coordenadas a ${fmt(farMax/1000,1)} km da origem comum do projeto: a visualização perde precisão; a análise geométrica usa precisão dupla`);
   m.storeysY=m.storeys.map(st=>({...st,y:st.elev*(m.unitPrefix==="MILLI"?0.001:m.unitPrefix==="CENTI"?0.01:1)-GLOBAL_OFFSET[1]}));
   const chunks=new Map();
   for(const [eid,rec] of perEl){
@@ -621,7 +627,7 @@ function buildGeometry(m){
     const cls=TYPE_NAME[l.type]||"IFCBUILDINGELEMENTPROXY";
     let x0=Infinity,y0=Infinity,z0=Infinity,x1=-Infinity,y1=-Infinity,z1=-Infinity;
     for(const g of rec.geoms){
-      const P=g.p;for(let k=0;k<P.length;k+=3){const X=P[k]=P[k]*s+cx,Y=P[k+1]=P[k+1]*s+cy,Z=P[k+2]=P[k+2]*s+cz;
+      const P=g.p64;for(let k=0;k<P.length;k+=3){const X=P[k],Y=P[k+1],Z=P[k+2];
         if(X<x0)x0=X;if(Y<y0)y0=Y;if(Z<z0)z0=Z;if(X>x1)x1=X;if(Y>y1)y1=Y;if(Z>z1)z1=Z}
     }
     const box=new THREE.Box3(new THREE.Vector3(x0,y0,z0),new THREE.Vector3(x1,y1,z1));
@@ -817,116 +823,31 @@ function excludedBy(el,P){
   return null;
 }
 function pairKey(a,b){return [a.guid,b.guid].sort().join("|")}
-/* ---- Teste geométrico fino (malha de triângulos) ---- */
-function trisIn(el,b){ // triângulos do elemento cuja caixa toca a caixa b → [ax,ay,az,bx,by,bz,cx,cy,cz,...]
-  const out=[];
-  for(const g of el.geoms){const P=g.p,I=g.i;
-    for(let k=0;k<I.length;k+=3){const a=I[k]*3,bb=I[k+1]*3,c=I[k+2]*3;
-      const x0=Math.min(P[a],P[bb],P[c]),x1=Math.max(P[a],P[bb],P[c]);if(x1<b[0]||x0>b[3]) continue;
-      const y0=Math.min(P[a+1],P[bb+1],P[c+1]),y1=Math.max(P[a+1],P[bb+1],P[c+1]);if(y1<b[1]||y0>b[4]) continue;
-      const z0=Math.min(P[a+2],P[bb+2],P[c+2]),z1=Math.max(P[a+2],P[bb+2],P[c+2]);if(z1<b[2]||z0>b[5]) continue;
-      out.push(P[a],P[a+1],P[a+2],P[bb],P[bb+1],P[bb+2],P[c],P[c+1],P[c+2]);}}
-  return out;
+/* ---- Núcleo geométrico: coordix-geometria.js (global CoordixGeo) ---- */
+const GEOC=window.CoordixGeo;
+const GEO_LABEL={confirmado:"Confirmado",abaixo_tolerancia:"Abaixo da tolerância",contato:"Contato",sem_conflito:"Sem conflito",inconclusivo:"Inconclusivo",incompleto:"Análise incompleta"};
+const GEO_FLAG={
+  malha_aberta:"malha aberta (superfície não fecha um volume)",orientacao_inconsistente:"orientação das faces inconsistente",superficie_sem_volume:"elemento só de superfície, sem volume",
+  triangulos_degenerados:"triângulos degenerados ignorados",sem_geometria_valida:"sem geometria válida",contencao_ambigua:"classificação dentro/fora ambígua em parte da região",
+  contencao_ou_coincidencia:"um elemento está contido no outro ou há faces coincidentes",espessura_com_lacuna:"espessura com intervalo de incerteza (limite de avaliações)",
+  volume_por_intervalo:"volume estimado por intervalo",limite_avaliacoes_espessura:"limite de avaliações atingido antes de decidir em relação à tolerância",
+  limite_pares_triangulos:"limite de pares de triângulos atingido",limite_pontos_prova:"limite de pontos de prova atingido",limite_pares_distancia:"limite de pares no cálculo da distância",
+  distancia_pode_ser_menor:"a distância real pode ser ainda menor (limite atingido)",profundidade_indeterminada:"superfícies se cruzam, mas a profundidade não pode ser medida",
+  contencao_verificada_aproximadamente:"contenção verificada de forma aproximada",contato_nao_verificado:"contato não verificado (limite)",interpenetracao:"os elementos se interpenetram",
+  distancia_maior_que_folga:"distância maior que a folga exigida",contencao_nao_verificada:"contenção não verificada",unidade_nao_suportada:"unidade de comprimento não suportada no modelo",
+};
+function geoFlagText(f){const m=f.match(/^(.*)_([AB])$/);return m&&GEO_FLAG[m[1]]?`${GEO_FLAG[m[1]]} (${m[2]})`:(GEO_FLAG[f]||f)}
+function solidOf(el){if(!el._solid) el._solid=GEOC.prepareMesh(el.geoms);return el._solid}
+function geoValueText(c){
+  if(c.value==null) return "—";
+  const g=c.geo||{};
+  if(c.kind==="hard") return (g.ub!=null&&g.lb!=null&&g.ub-g.lb>0.0005?"≥ ":"")+fmt(c.value,1)+" mm";
+  return "folga "+fmt(c.value,1)+" mm";
 }
-function segTri(px,py,pz,qx,qy,qz,T,o,out){ // segmento PQ × triângulo T[o..o+8]; empilha o ponto de cruzamento
-  const ax=T[o],ay=T[o+1],az=T[o+2];
-  const e1x=T[o+3]-ax,e1y=T[o+4]-ay,e1z=T[o+5]-az,e2x=T[o+6]-ax,e2y=T[o+7]-ay,e2z=T[o+8]-az;
-  const dx=qx-px,dy=qy-py,dz=qz-pz;
-  const hx=dy*e2z-dz*e2y,hy=dz*e2x-dx*e2z,hz=dx*e2y-dy*e2x;
-  const det=e1x*hx+e1y*hy+e1z*hz;if(Math.abs(det)<1e-14) return false;
-  const inv=1/det,sx=px-ax,sy=py-ay,sz=pz-az;
-  const u=(sx*hx+sy*hy+sz*hz)*inv;if(u<0||u>1) return false;
-  const qx2=sy*e1z-sz*e1y,qy2=sz*e1x-sx*e1z,qz2=sx*e1y-sy*e1x;
-  const v=(dx*qx2+dy*qy2+dz*qz2)*inv;if(v<0||u+v>1) return false;
-  const t=(e2x*qx2+e2y*qy2+e2z*qz2)*inv;if(t<0||t>1) return false;
-  if(out) out.push(px+dx*t,py+dy*t,pz+dz*t);
-  return true;
-}
-function triBoxOverlap(T,i,U,j){
-  for(let k=0;k<3;k++){const a0=Math.min(T[i+k],T[i+3+k],T[i+6+k]),a1=Math.max(T[i+k],T[i+3+k],T[i+6+k]);
-    const b0=Math.min(U[j+k],U[j+3+k],U[j+6+k]),b1=Math.max(U[j+k],U[j+3+k],U[j+6+k]);if(a1<b0||b1<a0) return false}
-  return true;
-}
-function crossPoints(TA,TB,out,limit=40000){ // pontos da curva de interseção entre as duas malhas
-  let n=0;
-  for(let i=0;i<TA.length;i+=9) for(let j=0;j<TB.length;j+=9){
-    if(++n>limit) return;
-    if(!triBoxOverlap(TA,i,TB,j)) continue;
-    for(let e=0;e<3;e++){const p=i+e*3,q=i+((e+1)%3)*3;segTri(TA[p],TA[p+1],TA[p+2],TA[q],TA[q+1],TA[q+2],TB,j,out)}
-    for(let e=0;e<3;e++){const p=j+e*3,q=j+((e+1)%3)*3;segTri(TB[p],TB[p+1],TB[p+2],TB[q],TB[q+1],TB[q+2],TA,i,out)}
-  }
-}
-function allTris(el){if(el._tris) return el._tris;el._tris=trisIn(el,[-Infinity,-Infinity,-Infinity,Infinity,Infinity,Infinity]);return el._tris}
-function pointInside(x,y,z,el){ // paridade de um raio levemente inclinado
-  const T=allTris(el);let c=0;const L=1e4;
-  for(let o=0;o<T.length;o+=9) if(segTri(x,y,z,x+L,y+L*0.00131,z+L*0.00071,T,o,null)) c++;
-  return (c&1)===1;
-}
-function insideVerts(src,dst,b,out,cap=160){
-  let n=0;
-  for(const g of src.geoms){const P=g.p;for(let k=0;k<P.length;k+=3){
-    const x=P[k],y=P[k+1],z=P[k+2];
-    if(x<b[0]||x>b[3]||y<b[1]||y>b[4]||z<b[2]||z>b[5]) continue;
-    if(++n>cap) return;
-    if(pointInside(x,y,z,dst)) out.push(x,y,z);
-  }}
-}
-function ptTriDist2(px,py,pz,T,o){ // Ericson, ponto mais próximo no triângulo
-  const ax=T[o],ay=T[o+1],az=T[o+2],bx=T[o+3],by=T[o+4],bz=T[o+5],cx=T[o+6],cy=T[o+7],cz=T[o+8];
-  const abx=bx-ax,aby=by-ay,abz=bz-az,acx=cx-ax,acy=cy-ay,acz=cz-az,apx=px-ax,apy=py-ay,apz=pz-az;
-  const d1=abx*apx+aby*apy+abz*apz,d2=acx*apx+acy*apy+acz*apz;let rx,ry,rz;
-  if(d1<=0&&d2<=0){rx=ax;ry=ay;rz=az}else{
-  const bpx=px-bx,bpy=py-by,bpz=pz-bz,d3=abx*bpx+aby*bpy+abz*bpz,d4=acx*bpx+acy*bpy+acz*bpz;
-  if(d3>=0&&d4<=d3){rx=bx;ry=by;rz=bz}else{
-  const vc=d1*d4-d3*d2;
-  if(vc<=0&&d1>=0&&d3<=0){const v=d1/(d1-d3);rx=ax+v*abx;ry=ay+v*aby;rz=az+v*abz}else{
-  const cpx=px-cx,cpy=py-cy,cpz=pz-cz,d5=abx*cpx+aby*cpy+abz*cpz,d6=acx*cpx+acy*cpy+acz*cpz;
-  if(d6>=0&&d5<=d6){rx=cx;ry=cy;rz=cz}else{
-  const vb=d5*d2-d1*d6;
-  if(vb<=0&&d2>=0&&d6<=0){const w=d2/(d2-d6);rx=ax+w*acx;ry=ay+w*acy;rz=az+w*acz}else{
-  const va=d3*d6-d5*d4;
-  if(va<=0&&(d4-d3)>=0&&(d5-d6)>=0){const w=(d4-d3)/((d4-d3)+(d5-d6));rx=bx+w*(cx-bx);ry=by+w*(cy-by);rz=bz+w*(cz-bz)}else{
-  const den=1/(va+vb+vc),v=vb*den,w=vc*den;rx=ax+abx*v+acx*w;ry=ay+aby*v+acy*w;rz=az+abz*v+acz*w}}}}}}
-  return (px-rx)**2+(py-ry)**2+(pz-rz)**2;
-}
-function segSegDist2(p1,q1,p2,q2){ // Ericson
-  const d1=[q1[0]-p1[0],q1[1]-p1[1],q1[2]-p1[2]],d2=[q2[0]-p2[0],q2[1]-p2[1],q2[2]-p2[2]],r=[p1[0]-p2[0],p1[1]-p2[1],p1[2]-p2[2]];
-  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];const a=dot(d1,d1),e=dot(d2,d2),f=dot(d2,r);let s,t;
-  if(a<=1e-12&&e<=1e-12){s=t=0}else if(a<=1e-12){s=0;t=Math.min(1,Math.max(0,f/e))}else{const c=dot(d1,r);
-    if(e<=1e-12){t=0;s=Math.min(1,Math.max(0,-c/a))}else{const b=dot(d1,d2),den=a*e-b*b;s=den!==0?Math.min(1,Math.max(0,(b*f-c*e)/den)):0;t=(b*s+f)/e;
-      if(t<0){t=0;s=Math.min(1,Math.max(0,-c/a))}else if(t>1){t=1;s=Math.min(1,Math.max(0,(b-c)/a))}}}
-  const x=p1[0]+d1[0]*s-(p2[0]+d2[0]*t),y=p1[1]+d1[1]*s-(p2[1]+d2[1]*t),z=p1[2]+d1[2]*s-(p2[2]+d2[2]*t);return x*x+y*y+z*z;
-}
-function meshDistance(TA,TB,limit=60000){
-  let best=Infinity,n=0;
-  for(let i=0;i<TA.length;i+=9) for(let j=0;j<TB.length;j+=9){
-    if(++n>limit) return Math.sqrt(best);
-    for(let k=0;k<3;k++){best=Math.min(best,ptTriDist2(TA[i+k*3],TA[i+k*3+1],TA[i+k*3+2],TB,j),ptTriDist2(TB[j+k*3],TB[j+k*3+1],TB[j+k*3+2],TA,i))}
-    for(let e=0;e<3;e++) for(let f=0;f<3;f++){
-      const p1=[TA[i+e*3],TA[i+e*3+1],TA[i+e*3+2]],q1=[TA[i+((e+1)%3)*3],TA[i+((e+1)%3)*3+1],TA[i+((e+1)%3)*3+2]];
-      const p2=[TB[j+f*3],TB[j+f*3+1],TB[j+f*3+2]],q2=[TB[j+((f+1)%3)*3],TB[j+((f+1)%3)*3+1],TB[j+((f+1)%3)*3+2]];
-      best=Math.min(best,segSegDist2(p1,q1,p2,q2));}
-  }
-  return Math.sqrt(best);
-}
-/* retorna {hit:boolean, value(mm), center:[x,y,z]} usando a geometria real */
-function exactTest(a,b,kind,tolM){
-  const pad=kind==="clearance"?tolM:0.0005;
-  const bx=[Math.max(a.box.min.x,b.box.min.x)-pad,Math.max(a.box.min.y,b.box.min.y)-pad,Math.max(a.box.min.z,b.box.min.z)-pad,
-            Math.min(a.box.max.x,b.box.max.x)+pad,Math.min(a.box.max.y,b.box.max.y)+pad,Math.min(a.box.max.z,b.box.max.z)+pad];
-  if(bx[0]>bx[3]||bx[1]>bx[4]||bx[2]>bx[5]) return null;
-  const TA=trisIn(a,bx),TB=trisIn(b,bx);if(!TA.length&&!TB.length) return null;
-  const pts=[];if(TA.length&&TB.length) crossPoints(TA,TB,pts);
-  insideVerts(a,b,bx,pts);insideVerts(b,a,bx,pts);
-  if(pts.length){
-    let x0=Infinity,y0=Infinity,z0=Infinity,x1=-Infinity,y1=-Infinity,z1=-Infinity;
-    for(let k=0;k<pts.length;k+=3){const x=pts[k],y=pts[k+1],z=pts[k+2];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;if(z<z0)z0=z;if(z>z1)z1=z}
-    const depth=Math.min(x1-x0,y1-y0,z1-z0)*1000;
-    return {inter:true,value:depth,center:[(x0+x1)/2,(y0+y1)/2,(z0+z1)/2]};
-  }
-  if(kind!=="clearance"||!TA.length||!TB.length) return null;
-  const d=meshDistance(TA,TB);
-  return d<tolM?{inter:false,value:d*1000,center:[(bx[0]+bx[3])/2,(bx[1]+bx[4])/2,(bx[2]+bx[5])/2]}:null;
+function geoChip(c){
+  const g=c.geo;if(!g) return "";
+  if(g.state!=="confirmado") return ` <span class="chip geo" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">${esc(GEO_LABEL[g.state]||g.state)}</span>`;
+  return g.quality==="aproximada"?` <span class="chip outline" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">aprox.</span>`:"";
 }
 function runAnalysis(){
   const P=proj();const models=(S.models[P.id]||[]).filter(m=>m.status==="pronto");
@@ -937,7 +858,7 @@ function runAnalysis(){
   for(const el of all){const why=excludedBy(el,P);if(why) excluded.push({el,why});else pool.push(el)}
   const found=new Map();
   const tests=P.tests.filter(t=>t.on).sort((a,b)=>a.ordem-b.ordem);
-  let below=0,rejected=0,nNarrow=0;const checked=new Set();
+  let below=0,rejected=0,nNarrow=0;const checked=new Set(),geoStats={};
   for(const t of tests){
     const A=pool.filter(e=>inGroup(e,t.a)),B=pool.filter(e=>inGroup(e,t.b));
     if(!A.length||!B.length) continue;
@@ -954,16 +875,18 @@ function runAnalysis(){
         const oz=Math.min(a.box.max.z,b.box.max.z)-Math.max(a.box.min.z,b.box.min.z);
         if(ox<-pad||oy<-pad||oz<-pad) continue;
         if(t.kind==="hard"&&(ox<=0||oy<=0||oz<=0)) continue;
-        const key=pairKey(a,b);if(found.has(key)||checked.has(key+t.id)) continue;
-        checked.add(key+t.id);nNarrow++;
-        const r=exactTest(a,b,t.kind,tol);
-        if(!r){if(t.kind==="hard") rejected++;continue}
-        let value=r.value,hit=false;
-        if(t.kind==="hard"){if(value>t.tol+0.5) hit=true; else below++}
-        else hit=true;
-        if(!hit) continue;
-        const center=new THREE.Vector3(...r.center);
-        found.set(key,{id:key,key,a:a.idx,b:b.idx,test:t.id,testName:`${GROUPS[t.a]} × ${GROUPS[t.b]}`,kind:t.kind,tol:t.tol,value:Math.round(value*10)/10,center:center.toArray()});
+        const key=a.idx<b.idx?a.idx+"|"+b.idx:b.idx+"|"+a.idx; // por índice: GUIDs repetidos não somem da análise
+        if(found.has(key)||checked.has(key+"|"+t.id)) continue;
+        checked.add(key+"|"+t.id);nNarrow++;
+        const r=GEOC.evaluatePair(solidOf(a),solidOf(b),{kind:t.kind,tol,volume:false}); // volume: calculado ao abrir o clash
+        if((a.m.unitUnsupported||b.m.unitUnsupported)&&r.state!=="confirmado"&&r.state!=="incompleto"){r.state="inconclusivo";r.flags.push("unidade_nao_suportada")}
+        geoStats[r.state]=(geoStats[r.state]||0)+1;
+        if(r.state==="sem_conflito"||r.state==="contato"){if(t.kind==="hard") rejected++;continue}
+        if(r.state==="abaixo_tolerancia"){below++;continue}
+        // confirmado, inconclusivo e incompleto entram na lista: nunca são tratados como ausência de conflito
+        const value=r.value==null?null:Math.round(r.value*1e4)/10;
+        found.set(key,{id:key,key:pairKey(a,b),a:a.idx,b:b.idx,test:t.id,testName:`${GROUPS[t.a]} × ${GROUPS[t.b]}`,kind:t.kind,tol:t.tol,value,center:r.center,
+          geo:{state:r.state,lb:r.lb,ub:r.ub,volume:r.volume,extent:r.extent,quality:r.quality,flags:r.flags,method:r.method}});
       }
     }
   }
@@ -971,10 +894,12 @@ function runAnalysis(){
   for(const c of list){prepareClash(c,P)}
   list.sort((x,y)=>levelRank(x.level)-levelRank(y.level)||CLS_ORDER.indexOf(x.cls)-CLS_ORDER.indexOf(y.cls));
   S.clashes[P.id]=list;
-  S.lastRun[P.id]={date:new Date().toISOString(),ms:Math.round(performance.now()-t0),elements:all.length,pool:pool.length,excluded,below,rejected,narrow:nNarrow,tests:tests.length};
+  S.lastRun[P.id]={date:new Date().toISOString(),ms:Math.round(performance.now()-t0),elements:all.length,pool:pool.length,excluded,below,rejected,narrow:nNarrow,tests:tests.length,geo:geoStats,
+    missing:models.filter(m=>m.skipped&&m.skipped.geometria).map(m=>({file:m.file,n:m.skipped.geometria})),unitIssues:models.filter(m=>m.unitUnsupported).map(m=>m.file)};
   renderAll();
   const pend=list.filter(c=>c.state!=="validado").length;
-  toast(`${list.length} clashes encontrados · ${pend} aguardando sua revisão.`);
+  const doubt=(geoStats.inconclusivo||0)+(geoStats.incompleto||0);
+  toast(`${list.length} clashes encontrados · ${pend} aguardando sua revisão${doubt?` · ${doubt} com resultado geométrico a verificar`:""}.`);
 }
 function levelOrder(){
   const P=proj();const ms=(S.models[P.id]||[]).filter(m=>m.storeys);
@@ -983,6 +908,7 @@ function levelOrder(){
 }
 function levelRank(name){const o=levelOrder();const i=o.indexOf(name);return i<0?999:i}
 function suggest(c,P){
+  if(c.value==null) c={...c,value:NaN};
   const A=ELEMS[c.a],B=ELEMS[c.b];
   for(const r of RULES){const cfg=P.rules[r.id]||{on:true,cls:r.cls};if(!cfg.on) continue;
     let ok=false;try{ok=r.test(c,A,B)}catch(e){}
@@ -1139,7 +1065,7 @@ function viewModelos(){
           <td style="min-width:200px"><select data-disc="${m.id}" aria-label="Disciplina">${discOpts(m.code)}</select></td>
           <td class="num">${m.status==="pronto"?fmt(m.elems.length):"—"}</td>
           <td style="font-size:12.5px">${(m.storeys||[]).map(s=>esc(s.name)).join(", ")||"—"}</td>
-          <td>${m.status==="pronto"?'<span class="chip ok">Lido</span>'+(m.skipped&&Object.keys(m.skipped).length?`<div class="muted" style="font-size:12px;margin-top:4px" title="Entidades que o leitor não conseguiu interpretar e pulou">Ignorados: ${Object.entries(m.skipped).map(([k,n])=>esc(k)+" ("+n+")").join(", ")}</div>`:"")+(m.schema?`<div class="muted mono" style="margin-top:2px">${esc(m.schema)}</div>`:""):m.status==="erro"?`<span class="chip P1" title="${esc(m.error)}">Erro</span> <span class="muted" style="font-size:12px">${esc(m.error)}</span>`:`<div class="prog"><i style="width:${Math.max(8,m.progress*100)}%"></i></div>`}</td>
+          <td>${m.status==="pronto"?'<span class="chip ok">Lido</span>'+(m.skipped&&Object.keys(m.skipped).length?`<div class="muted" style="font-size:12px;margin-top:4px" title="Entidades que o leitor não conseguiu interpretar e pulou">Ignorados: ${Object.entries(m.skipped).map(([k,n])=>esc(k)+" ("+n+")").join(", ")}</div>`:"")+(m.schema?`<div class="muted mono" style="margin-top:2px">${esc(m.schema)}</div>`:"")+(m.geoFlags&&m.geoFlags.length?m.geoFlags.map(f=>`<div style="font-size:12px;margin-top:4px;color:var(--p2)">${esc(f)}</div>`).join(""):""):m.status==="erro"?`<span class="chip P1" title="${esc(m.error)}">Erro</span> <span class="muted" style="font-size:12px">${esc(m.error)}</span>`:`<div class="prog"><i style="width:${Math.max(8,m.progress*100)}%"></i></div>`}</td>
           <td class="tight"><input type="checkbox" data-vis="${m.id}" ${m.visible?"checked":""} aria-label="Visível"></td>
           <td class="tight"><button class="btn small ghost" data-rm-model="${m.id}">Remover</button></td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty">Nenhum modelo neste projeto ainda.</div>`}
@@ -1261,6 +1187,13 @@ function viewRegras(){
   </section>`;
 }
 
+function geoSummary(run){
+  if(!run.geo) return "";
+  const g=run.geo,order=["confirmado","abaixo_tolerancia","contato","sem_conflito","inconclusivo","incompleto"];
+  const parts=order.filter(k=>g[k]).map(k=>`<span class="num">${g[k]}</span> ${GEO_LABEL[k].toLowerCase()}`);
+  const warn=[...(run.missing||[]).map(x=>`${x.n} geometrias de ${esc(x.file)} não puderam ser lidas e ficaram fora da análise`),...(run.unitIssues||[]).map(f=>`unidade não suportada em ${esc(f)}`)];
+  return `<div class="muted" style="font-size:12.5px">Pares verificados na geometria: ${parts.join(" · ")||"nenhum"}</div>${warn.length?`<div style="font-size:12.5px;color:var(--p2)">${warn.join(" · ")}</div>`:""}`;
+}
 /* ---------- 5. Clashes por nível ---------- */
 function viewClashes(){
   const P=proj();const cl=currentClashes();const run=S.lastRun[P.id];
@@ -1275,10 +1208,11 @@ function viewClashes(){
       <div><h1>Clashes por nível</h1><p class="lede" style="margin:0">${run?`Última análise em ${dateBR(run.date)} · ${run.tests} testes · ${fmt(run.pool)} de ${fmt(run.elements)} elementos analisados · ${run.ms} ms`:"A análise ainda não foi executada neste projeto."}</p></div>
       <button class="btn primary" data-run>Executar análise</button>
     </div>
-    ${pend?`<div class="alert"><div class="grow"><b class="num">${pend} clashes foram pré-classificados automaticamente.</b> Revise a classificação antes de emitir os BCFs.</div><button class="btn accent" data-nav="revisao">Revisar um por um</button></div>`:""}
+    ${pend?`<div class="alert"><div class="grow"><b class="num">${pend} clashes foram pré-classificados automaticamente.</b> Revise a classificação antes de emitir os BCFs.${run&&run.geo&&((run.geo.inconclusivo||0)+(run.geo.incompleto||0))?` <b class="num">${(run.geo.inconclusivo||0)+(run.geo.incompleto||0)}</b> deles têm resultado geométrico inconclusivo ou incompleto e precisam de verificação no 3D.`:""}</div><button class="btn accent" data-nav="revisao">Revisar um por um</button></div>`:""}
     ${run?`<div class="row" style="justify-content:space-between">
       <div class="seg" role="group"><button data-ctab="real" aria-pressed="${tab==="real"}">A corrigir <span class="num">(${real.length})</span></button><button data-ctab="fake" aria-pressed="${tab==="fake"}">Falsos clashes <span class="num">(${fake.length})</span></button></div>
-      <div class="muted" style="font-size:12.5px">${run.excluded.length?`${run.excluded.length} elementos excluídos por filtro · `:""}${run.below?`${run.below} interferências abaixo da tolerância ignoradas · `:""}${run.rejected?`${run.rejected} contatos só de caixa descartados pela geometria real`:""}</div></div>`:""}
+      <div class="muted" style="font-size:12.5px">${run.excluded.length?`${run.excluded.length} elementos excluídos por filtro · `:""}${run.below?`${run.below} interferências abaixo da tolerância ignoradas · `:""}${run.rejected?`${run.rejected} pares sem conflito ou só em contato`:""}</div></div>
+      ${geoSummary(run)}`:""}
     ${!run?`<div class="empty">Configure os testes em <b>Regras de análise</b> e clique em <b>Executar análise</b>.</div>`:
       !list.length?`<div class="empty">${tab==="real"?"Nenhum clash a corrigir.":"Nenhum falso clash identificado."}</div>`:
       lvOrder.map(lv=>{const items=levels.get(lv);const counts=CLS_ORDER.map(k=>[k,items.filter(c=>c.cls===k).length]).filter(x=>x[1]);
@@ -1288,7 +1222,7 @@ function viewClashes(){
           <td class="mono">${esc(c.title)}</td><td style="font-size:12.5px">${esc(c.testName)}</td>
           <td>${esc(entityName(A.cls))}<div class="muted" style="font-size:12px">${esc(A.code)} · ${esc(A.name)}</div></td>
           <td>${esc(entityName(B.cls))}<div class="muted" style="font-size:12px">${esc(B.code)} · ${esc(B.name)}</div></td>
-          <td class="num">${c.kind==="hard"?fmt(c.value,1)+" mm":"folga "+fmt(c.value,1)+" mm"}<div class="muted" style="font-size:12px">tol. ${c.tol} mm</div></td>
+          <td class="num">${geoValueText(c)}${geoChip(c)}<div class="muted" style="font-size:12px">tol. ${c.tol} mm</div></td>
           <td><span class="chip ${c.cls}">${CLASSES[c.cls].label}</span></td>
           <td style="font-size:12.5px">${esc(c.resp?memberName(c.resp):"—")}</td>
           <td>${c.state==="validado"?'<span class="chip ok">Validado</span>':'<span class="chip sug">Sugerido</span>'}</td></tr>`}).join("")}</tbody></table></div></details>`}).join("")}
@@ -1319,6 +1253,19 @@ function renderQueue(){
     return h+`<div class="qitem ${S.ui.reviewSel===c.id?"sel":""}" data-q="${esc(c.id)}"><span class="chip ${c.cls}" style="min-width:44px;justify-content:center">${c.cls==="FALSO"?"Falso":c.cls}</span>
       <div style="min-width:0"><div class="t mono">${esc(c.title)} ${c.state==="validado"?'<span style="color:var(--ok)">✓</span>':""}</div><div class="s">${esc(entityName(A.cls))} × ${esc(entityName(B.cls))}</div></div></div>`}).join("");
 }
+function geoDetails(c){
+  const g=c.geo;if(!g) return "";
+  if(c.kind==="hard"&&g.state==="confirmado"&&!g.volume&&ELEMS[c.a].geoms.length&&ELEMS[c.b].geoms.length){
+    try{const v=GEOC.pairVolume(solidOf(ELEMS[c.a]),solidOf(ELEMS[c.b]),20000);g.volume={vmin:v.vmin,vmax:v.vmax};g.extent=v.extent;if(!v.exact&&v.vmax-v.vmin>1e-12&&!g.flags.includes("volume_por_intervalo")) g.flags.push("volume_por_intervalo")}catch(e){console.warn("COORDIX: volume",e)}
+  }
+  const m3=v=>v>=1e-3?fmt(v*1000,2)+" L":fmt(v*1e6,1)+" cm³";
+  const rows=[`<span>Resultado geométrico</span><span>${esc(GEO_LABEL[g.state]||g.state)}${g.quality==="aproximada"?' <span class="chip outline">aproximado</span>':""}${g.method==="convexo_exato"?' <span class="muted" style="font-size:12px">· cálculo exato (peças convexas)</span>':g.method==="ramo_e_limite"?' <span class="muted" style="font-size:12px">· cálculo por limites</span>':""}</span>`];
+  if(c.kind==="hard"&&g.lb!=null&&g.ub!=null&&g.ub-g.lb>0.0005) rows.push(`<span>Intervalo da espessura</span><span class="num">${fmt(g.lb*1000,1)} a ${fmt(g.ub*1000,1)} mm</span>`);
+  if(g.volume) rows.push(`<span>Volume de interseção</span><span class="num">${g.volume.vmax-g.volume.vmin<=1e-12?m3(g.volume.vmin):`${m3(g.volume.vmin)} a ${m3(g.volume.vmax)}`}</span>`);
+  if(g.extent) rows.push(`<span>Região de interseção</span><span class="num">${[0,1,2].map(k=>fmt((g.extent[k+3]-g.extent[k])*1000,0)).join(" × ")} mm <span class="muted" style="font-size:12px">(caixa, não é a penetração)</span></span>`);
+  if(g.flags&&g.flags.length) rows.push(`<span>Observações</span><span style="font-size:12.5px">${g.flags.map(f=>esc(geoFlagText(f))).join("; ")}</span>`);
+  return rows.join("");
+}
 function renderReviewCard(refocus=false){
   const host=$("#rcard");if(!host) return;
   const items=queueItems();
@@ -1336,7 +1283,8 @@ function renderReviewCard(refocus=false){
   host.innerHTML=`<div class="card">
     <div class="row" style="justify-content:space-between"><div><div class="mono" style="font-weight:600;font-size:15px">${esc(c.title)}</div><div class="muted" style="font-size:12.5px">${esc(c.level)} · ${esc(c.testName)}</div></div>
       <div class="muted num" style="font-size:12px">${pos>=0?`${pos+1} de ${items.length}`:""}</div></div>
-    <div class="kv"><span>${c.kind==="hard"?"Penetração":"Folga"}</span><span class="num">${fmt(c.value,1)} mm <span class="muted">(tolerância ${c.tol} mm)</span></span>
+    <div class="kv"><span>${c.kind==="hard"?"Espessura de interferência":"Folga medida"}</span><span class="num">${geoValueText(c)} <span class="muted">(tolerância ${c.tol} mm)</span></span>
+      ${geoDetails(c)}
       <span>Sua decisão</span><span>${c.state==="validado"?`<span class="chip ${c.cls}">${CLASSES[c.cls].label}</span> <span class="chip ok">validado</span>`:'<span class="chip sug">aguardando revisão</span>'}</span>
       <span>Sugestão do sistema</span><span><span class="chip ${sugg.cls}">${CLASSES[sugg.cls].label}</span>${c.state==="validado"&&c.cls!==sugg.cls?' <span class="muted" style="font-size:12px">você alterou</span>':""}</span></div>
     <div class="reason"><b>Por quê:</b> ${esc(sugg.reason)}<div class="muted" style="margin-top:2px">Regra: ${esc(sugg.cond||"—")}</div></div>
@@ -1583,7 +1531,7 @@ async function handleFiles(files){
 function removeModel(id){
   const P=proj();const list=S.models[P.id]||[];const m=list.find(x=>x.id===id);if(!m) return;
   for(const c of m.chunks){V.root.remove(c);c.geometry.dispose();c.material.dispose()}
-  for(const i of m.elems) ELEMS[i].geoms=[];
+  for(const i of m.elems){ELEMS[i].geoms=[];ELEMS[i]._solid=null}
   try{if(m.mid!=null) api.CloseModel(m.mid)}catch(e){}
   S.models[P.id]=list.filter(x=>x!==m);
   S.clashes[P.id]=(S.clashes[P.id]||[]).filter(c=>ELEMS[c.a].model!==id&&ELEMS[c.b].model!==id);
