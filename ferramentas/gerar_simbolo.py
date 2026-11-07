@@ -95,6 +95,7 @@ open(R_+"coordix-simbolo-sobrancelha.svg","w").write(HDR+com_estilo(svg("0 1 62 
 corpo=svg("4 19 58 26")
 ini=corpo.index("<defs>"); fim=corpo.rindex("</svg>")
 miolo=corpo[ini:fim].replace('class="cx-palpebra"','class="cx-palpebra" fill="#eceef1"').replace('class="cx-cilios"','class="cx-cilios" fill="#eceef1"').replace('class="cx-inferior"','class="cx-inferior" stroke="#eceef1" opacity=".55"').replace('class="cx-iris"','class="cx-iris" fill="#9a5a32"').replace('class="cx-limbo"','class="cx-limbo" stroke="#4a2a16"').replace('class="cx-pupila"','class="cx-pupila" fill="#140b06"').replace('class="cx-brilho"','class="cx-brilho" fill="#ffffff"')
+miolo=miolo.replace('class="cx-','class="cxi-').replace('cx-abertura','cxi-abertura')  # nomes próprios: o ícone não herda estilos de uma página que use o símbolo
 icone=f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="COORDIX">
 <title>COORDIX</title>
 <rect width="512" height="512" rx="64" fill="#15181d"/>
