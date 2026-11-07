@@ -13,6 +13,7 @@ A automação faz a parte repetitiva e o coordenador BIM continua responsável p
 |---|---|
 | Projeto e equipe | Projetos separados, integrantes com cargo, códigos de disciplina e e-mail, indicação do coordenador |
 | Modelos IFC | Upload por arrastar e soltar, disciplina detectada pelo código no nome do arquivo (EST, ARQ, SAN, ELE, SCE, PCI, CLI…), esquema IFC e entidades ignoradas na leitura |
+| Interface | Identidade "Industrial Precision", modo claro e escuro (preferência salva) e símbolo próprio |
 | Visualizador | 3D com árvore modelo → pavimento → entidade, isolar, aproximar e snapshot |
 | Propriedades | Aba **Geral** no padrão Visus (Disciplina, **Entidade**, ID IFC, Layer, Pavimento, Type) e aba **PropertySets** com quantitativos e propriedades do tipo |
 | Regras de análise | Matriz de tolerância com os 21 testes do manual corporativo (interferência ou folga, em mm), filtros de exclusão por entidade ou PropertySet, ordem de flexibilidade das disciplinas e tabela de nomes de Entidade editável |
@@ -44,6 +45,8 @@ coordix-geometria.js             núcleo geométrico (sem dependências; navegad
 web-ifc.wasm                     motor de leitura IFC (web-ifc 0.0.39)
 exemplos/                        IFCs fictícios com conflitos planejados
 ferramentas/gerar_ifc_exemplo.py gera os IFCs de exemplo
+ferramentas/gerar_simbolo.py     gera o símbolo do COORDIX (SVG)
+marca/                           símbolo, versão com sobrancelha e ícone do aplicativo
 testes/geometria.test.js         suíte de testes geométricos (101 cenários)
 testes/bvh.test.js               testes da BVH: estrutura e equivalência com o núcleo da Fase 01
 testes/desempenho_bvh.js         medição de desempenho (linear × BVH SAH × BVH mediana)
@@ -54,6 +57,7 @@ testes/legado_v1.js              motor da v1, preservado só para o comparativo
 docs/fase-01-relatorio.md        relatório técnico da Fase 01
 docs/fase-01-rodada-complementar.md  correções da revisão técnica da Fase 01
 docs/fase-02-marco-01-bvh.md     relatório da Fase 02 · Marco 1 (BVH por elemento)
+docs/redesign-industrial-precision.md  identidade visual, sistema de design e temas
 ```
 
 ## Testes
