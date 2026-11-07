@@ -27,7 +27,7 @@ function caso(id, nome, A, B, opt, esperado) {
     }
     if (esperado.contemEspessura != null) { // espessura exata deve estar dentro de [lb, ub]
       const e = esperado.contemEspessura;
-      if (!(mm(r.lb) <= e + 1e-6 && e <= mm(r.ub) + 1e-6)) problemas.push(`espessura exata ${e} mm fora de [${mm(r.lb).toFixed(3)}, ${mm(r.ub).toFixed(3)}]`);
+      if (!(r.lb != null && r.ub != null && mm(r.lb) <= e + 1e-6 && e <= mm(r.ub) + 1e-6)) problemas.push(`espessura exata ${e} mm fora de [${r.lb == null ? "—" : mm(r.lb).toFixed(3)}, ${r.ub == null ? "sem garantia" : mm(r.ub).toFixed(3)}]`);
     }
     if (esperado.volume != null) {
       const v = esperado.volume;
@@ -38,7 +38,7 @@ function caso(id, nome, A, B, opt, esperado) {
     if (esperado.naoEstado && esperado.naoEstado.includes(r.state)) problemas.push(`estado proibido ${r.state}`);
   }
   const ok = problemas.length === 0; if (!ok) falhas++;
-  resultados.push({ id, nome, ok, problemas, ms, esperado, r: r && { state: r.state, value: mm(r.value), lb: mm(r.lb), ub: mm(r.ub), volume: r.volume, quality: r.quality, flags: r.flags, stats: r.stats } });
+  resultados.push({ id, nome, ok, problemas, ms, esperado, r: r && { state: r.state, kind: r.kind, value: mm(r.value), lb: mm(r.lb), ub: mm(r.ub), volume: r.volume, quality: r.quality, metricQuality: r.metricQuality, evidence: r.evidence, flags: r.flags, stats: r.stats } });
 }
 function verificar(id, nome, fn) {
   let ok = false, detalhe = "";
@@ -140,7 +140,7 @@ caso("C12a", "Elemento só com triângulos degenerados", mesh(F.degenerada()), c
 caso("C12b", "Cubo com triângulos degenerados extras × cubo sobreposto 20 mm", mesh(F.comDegenerados(F.caixa(0, 0, 0, 1, 1, 1))), mesh(F.caixa(0.98, 0, 0, 1.98, 1, 1)), { kind: "hard", tol: 0.005 },
   { estado: S.CONFIRMADO, valor: [19.5, 20.0001], flags: ["triangulos_degenerados_A"] });
 caso("C12c", "Superfície plana (sem volume) atravessando cubo", mesh(F.placaPlana(0.5, -0.5, -0.5, 1.5, 1.5)), cubo, { kind: "hard", tol: 0 },
-  { estado: S.INCONCLUSIVO, flags: ["superficie_sem_volume_A", "profundidade_indeterminada"] });
+  { estado: S.INCONCLUSIVO, flags: ["superficie_sem_volume_A", "intersecao_de_superficies", "intersecao_sem_medida_confiavel"] }); // rodada complementar: aviso renomeado (antes "profundidade_indeterminada")
 
 /* ---------------- Regressões e robustez ---------------- */
 caso("R01", "Tubo diagonal afastado do pilar, com caixas sobrepostas (bug v1)", mesh(F.caixa(0, 0, 0, 0.3, 3, 0.3)), mesh(F.cilindro([-1.2, 1, -2], [2.8, 1.4, 2.6], 0.05, 32)), { kind: "hard", tol: 0.005 },
@@ -196,11 +196,12 @@ verificar("R10", "Topologia: fechada/aberta, orientação e degenerados detectad
   const ok = c.closed && c.oriented && c.orientSign === 1 && Math.abs(c.volume - 1) < 1e-12 && !ab.closed && inv.closed && inv.oriented && inv.orientSign === -1 && dg.degenerate === 2 && dg.n === 12;
   return { ok, detalhe: JSON.stringify({ cubo: [c.closed, c.oriented, c.orientSign], aberta: ab.closed, invertida: [inv.closed, inv.orientSign], degenerados: dg.degenerate }) };
 });
-verificar("R11", "Unidades: milímetros convertidos, metros preservados, prefixo desconhecido sinalizado", () => {
-  const a = G.unitScaleFor("MILLI", 25000), b = G.unitScaleFor("MILLI", 25), c = G.unitScaleFor("", 30), d = G.unitScaleFor("XYZ", 30);
-  const ok = a.scale === 0.001 && !a.assumed && b.scale === 1 && b.assumed && c.scale === 1 && d.unknown;
-  return { ok, detalhe: JSON.stringify({ a, b, c, d }) };
+verificar("R11", "Unidades: escala vem da unidade declarada, sem heurística pela extensão (revisado na rodada complementar)", () => {
+  const a = G.unitScaleFor("MILLI"), b = G.unitScaleFor(""), d = G.unitScaleFor("XYZ");
+  const ok = a.scale === 0.001 && a.status === "declarada" && b.scale === 1 && d.status === "nao_suportada";
+  return { ok, detalhe: JSON.stringify({ a, b, d }) };
 });
+
 
 caso("R14", "Malha fina com orientação inconsistente — não pode concluir ausência", mesh(F.caixaSubdividida(-0.5, 0, 0, 0.5, 0.15, 3, 40, { inconsistente: true })), mesh(F.cilindro([0, -1, 1.5], [0, 1, 1.5], 0.05, 256)), { kind: "hard", tol: 0.005 },
   { qualidade: "aproximada", flags: ["orientacao_inconsistente_A"], naoEstado: [S.SEM_CONFLITO, S.CONTATO, S.ABAIXO_TOL] });
@@ -212,6 +213,10 @@ caso("R17", "Cena girada: tubo Ø50 × alma do perfil I (não convexo)", mesh(F.
   { estado: S.CONFIRMADO, valor: [7.9, 8.0001], contemEspessura: 8 });
 caso("R18", "Malha fina contida (2.400 vértices) — limite de 160 vértices da v1", cubo, mesh(F.caixaSubdividida(0.4, 0.4, 0.4, 0.6, 0.6, 0.6, 20)), { kind: "hard", tol: 0.005 },
   { estado: S.CONFIRMADO, valor: [199.99, 200.0001], volume: 0.008 });
+verificar("T11", "Componentes sobrepostos com faces coplanares são detectados (regressão da rodada)", () => {
+  const A = mesh(F.caixa(0, 0, 0, 1, 1, 1), F.caixa(0.5, 0, 0, 1.5, 1, 1)), B = mesh(F.caixa(0, 0, 0, 1, 1, 1), F.caixa(2, 0, 0, 3, 1, 1));
+  return { ok: G.selfOverlap(A) === true && G.selfOverlap(B) === false, detalhe: `sobrepostos=${G.selfOverlap(A)} separados=${G.selfOverlap(B)}` };
+});
 verificar("R12", "Verificação cruzada: ramo-e-limite × centro de Chebyshev nos pares convexos", () => {
   const pares = [
     ["C02a", cubo, mesh(F.caixa(0.98, 0, 0, 1.98, 1, 1)), 20],
@@ -242,12 +247,151 @@ verificar("R13", "Volume de peça não convexa (perfil I × tubo) contém o valo
   return { ok, detalhe: `exato ${exato.toExponential(4)} m³ ∈ [${r.volume.vmin.toExponential(4)}; ${r.volume.vmax.toExponential(4)}]` };
 });
 
+/* =====================================================================
+ * RODADA COMPLEMENTAR — testes de regressão obrigatórios
+ * Resultados esperados definidos pelas regras da rodada, antes da execução.
+ * ===================================================================== */
+const unir = (...gs) => { const P = [], I = []; let off = 0; for (const g of gs) { P.push(...g.p64); for (const k of g.i) I.push(k + off); off += g.p64.length / 3; } return { p64: Float64Array.from(P), i: Uint32Array.from(I) }; };
+const inverterTriangulos = (g, desde, ate) => { const I = Uint32Array.from(g.i); for (let k = desde * 3; k < ate * 3; k += 3) { const x = I[k + 1]; I[k + 1] = I[k + 2]; I[k + 2] = x; } return { p64: g.p64, i: I }; };
+const comAleta = (g) => { const n = g.p64.length / 3; return { p64: Float64Array.from([...g.p64, 0.5, -0.5, 0]), i: Uint32Array.from([...g.i, 0, 1, n]) }; }; // 3ª face na aresta 0–1
+const topo = (id, nome, geom, esperado) => verificar(id, nome, () => {
+  const m = mesh(geom); const falhas = Object.entries(esperado).filter(([k, v]) => typeof v === "function" ? !v(m[k]) : m[k] !== v).map(([k]) => k);
+  return { ok: !falhas.length, detalhe: `topologia=${m.topology} componentes=${m.components} bordas=${m.boundaryEdges} nãoManifold(arestas/vértices)=${m.nonManifoldEdges}/${m.nonManifoldVertices} inconsistentes=${m.inconsistentEdges} vazios=${m.voids}${falhas.length ? " — divergiu em: " + falhas.join(", ") : ""}` };
+});
+
+/* ---- Topologia ---- */
+topo("T01", "Malha fechada e manifold (cubo)", F.caixa(0, 0, 0, 1, 1, 1), { topology: "solido_valido", components: 1, boundaryEdges: 0, nonManifoldEdges: 0, nonManifoldVertices: 0, inconsistentEdges: 0 });
+topo("T02", "Malha aberta (cubo sem a tampa)", F.removerFace(F.caixa(0, 0, 0, 1, 1, 1), 2, 1), { topology: "aberta", boundaryEdges: (v) => v === 4, nonManifoldEdges: 0 });
+topo("T03", "Aresta compartilhada por 3 faces (aleta)", comAleta(F.caixa(0, 0, 0, 1, 1, 1)), { topology: "invalida", nonManifoldEdges: (v) => v >= 1 });
+topo("T04", "Orientação inconsistente (uma face invertida)", inverterTriangulos(F.caixa(0, 0, 0, 1, 1, 1), 0, 2), { topology: "invalida", inconsistentEdges: (v) => v > 0, insideMode: "paridade" });
+topo("T05", "Componentes desconectados (dois cubos separados)", unir(F.caixa(0, 0, 0, 1, 1, 1), F.caixa(2, 0, 0, 3, 1, 1)), { topology: "solido_valido", components: 2 });
+topo("T06", "Vértice não manifold (cubos unidos por um vértice)", unir(F.caixa(0, 0, 0, 1, 1, 1), F.caixa(1, 1, 1, 2, 2, 2)), { topology: "invalida", nonManifoldVertices: (v) => v >= 1, nonManifoldEdges: 0 });
+topo("T07", "Vazio interno (casca interna com orientação oposta) é sólido válido", unir(F.caixa(0, 0, 0, 1, 1, 1), F.inverter(F.caixa(0.3, 0.3, 0.3, 0.7, 0.7, 0.7))), { topology: "solido_valido", voids: 1, components: 2 });
+topo("T08", "Componente separado com orientação invertida é inválido", unir(F.caixa(0, 0, 0, 1, 1, 1), F.inverter(F.caixa(2, 0, 0, 3, 1, 1))), { topology: "invalida", orientationConflict: true });
+topo("T09", "Fusão de vértices na fronteira de célula não cria bordas falsas", F.mover(F.caixa(0, 0, 0, 1, 1, 1), 0.000005, 0.000015, 0.0000049999), { topology: "solido_valido", boundaryEdges: 0 });
+caso("T10", "Malha não manifold não é usada como sólido (sobreposição de 20 mm)", mesh(comAleta(F.caixa(0, 0, 0, 1, 1, 1))), mesh(F.caixa(0.98, 0.1, 0.1, 1.98, 0.9, 0.9)), { kind: "hard", tol: 0.005 }, // B recuado nas laterais: cruzamento transversal real
+  { qualidade: "aproximada", flags: ["topologia_invalida_A", "arestas_nao_manifold_A", "intersecao_de_superficies"], naoEstado: [S.SEM_CONFLITO, S.CONTATO, S.ABAIXO_TOL] });
+
+/* ---- Integridade geométrica (leitor por elemento com falhas simuladas) ---- */
+const cuboVD = (() => { const c = F.caixa(0, 0, 0, 1, 1, 1), vd = []; for (let k = 0; k < c.p64.length; k += 3) vd.push(c.p64[k], c.p64[k + 1], c.p64[k + 2], 0, 0, 1); return { vd: Float32Array.from(vd), id: Uint32Array.from(c.i) }; })();
+const I4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+function leitor(falhas) { // falhas: {geomIdx: "geometria"|"vertices"|"indices"|"indiceForaDoIntervalo"}
+  const log = { criadas: 0, liberadas: 0 };
+  return { log, r: {
+    getGeometry: (ref) => { if (falhas[ref.geometryExpressID] === "geometria") throw new Error("GetGeometry falhou"); log.criadas++; return { id: ref.geometryExpressID }; },
+    getVertices: (g) => { if (falhas[g.id] === "vertices") throw new Error("GetVertexArray falhou"); return cuboVD.vd; },
+    getIndices: (g) => { if (falhas[g.id] === "indices") throw new Error("GetIndexArray falhou"); if (falhas[g.id] === "indiceForaDoIntervalo") return Uint32Array.from([0, 1, 99]); return cuboVD.id; },
+    release: () => { log.liberadas++; }, transform: () => I4 } };
+}
+const refs3 = [{ geometryExpressID: 101 }, { geometryExpressID: 102 }, { geometryExpressID: 103 }];
+verificar("I01", "Elemento com 3 geometrias e falha em uma (GetGeometry)", () => {
+  const { r, log } = leitor({ 102: "geometria" }); const o = G.readElementGeometries(refs3, r);
+  const ok = o.integrity === "parcial" && o.geoms.length === 2 && o.failures.length === 1 && o.failures[0].ref.geometryExpressID === 102 && o.failures[0].stage === "geometria" && log.liberadas === log.criadas;
+  return { ok, detalhe: `integridade=${o.integrity} lidas=${o.geoms.length} falhas=${JSON.stringify(o.failures.map(f => [f.ref.geometryExpressID, f.stage]))} recursos ${log.liberadas}/${log.criadas} liberados` };
+});
+verificar("I02", "Elemento com todas as geometrias inválidas", () => {
+  const { r } = leitor({ 101: "vertices", 102: "indices", 103: "indiceForaDoIntervalo" }); const o = G.readElementGeometries(refs3, r);
+  return { ok: o.integrity === "nao_processada" && o.geoms.length === 0 && o.failures.length === 3, detalhe: `integridade=${o.integrity} etapas=${o.failures.map(f => f.stage).join(",")}` };
+});
+verificar("I03", "Falha na leitura de índices libera o recurso e é registrada", () => {
+  const { r, log } = leitor({ 103: "indices" }); const o = G.readElementGeometries(refs3, r);
+  return { ok: o.integrity === "parcial" && o.failures[0].stage === "indices" && log.liberadas === 3, detalhe: `etapa=${o.failures[0].stage} recursos liberados=${log.liberadas}/3` };
+});
+verificar("I04", "Índice fora do intervalo é rejeitado na validação (não vira geometria parcial silenciosa)", () => {
+  const { r } = leitor({ 101: "indiceForaDoIntervalo" }); const o = G.readElementGeometries(refs3, r);
+  return { ok: o.failures.length === 1 && o.failures[0].stage === "validacao" && /fora do intervalo/.test(o.failures[0].reason), detalhe: JSON.stringify(o.failures.map(f => [f.stage, f.reason])) };
+});
+verificar("I05", "Elemento com GUID e geometria parcial: falha identificável e malha marcada como incompleta", () => {
+  const { r } = leitor({ 102: "vertices" }); const o = G.readElementGeometries(refs3, r);
+  const el = { guid: "2N1qr7$8f3Bw0Kc9Lx1Abc", geoIntegrity: o.integrity, geoFailures: o.failures.map(f => ({ geometryExpressID: f.ref.geometryExpressID, stage: f.stage })) };
+  const m = G.prepareMesh(o.geoms.map(g => ({ p64: g.w, i: g.i })), { incomplete: el.geoIntegrity !== "completa" });
+  return { ok: el.geoIntegrity === "parcial" && el.geoFailures[0].geometryExpressID === 102 && m.incomplete === true, detalhe: JSON.stringify(el) };
+});
+const pilarIncompleto = G.prepareMesh([F.caixa(0, 0, 0, 0.3, 3, 0.3)], { incomplete: true });
+caso("K04", "Geometria incompleta com aparente ausência de conflito", pilarIncompleto, mesh(F.cilindro([-1.2, 1, -2], [2.8, 1.4, 2.6], 0.05, 32)), { kind: "hard", tol: 0.005 },
+  { estado: S.INCONCLUSIVO, flags: ["geometria_incompleta_A", "ausencia_nao_confirmada_geometria_incompleta"] });
+caso("K05", "Geometria incompleta com evidência positiva de conflito", G.prepareMesh([F.caixa(0, 0, 0, 1, 1, 1)], { incomplete: true }), mesh(F.caixa(0.98, 0, 0, 1.98, 1, 1)), { kind: "hard", tol: 0.005 },
+  { estado: S.CONFIRMADO, valor: [19.999, 20.0001], flags: ["representacao_completa_nao_validada"] });
+caso("K06", "Geometria incompleta: folga atendida não é confirmada", G.prepareMesh([F.caixa(0, 0, 0, 1, 1, 1)], { incomplete: true }), cuboGap, { kind: "clearance", tol: 0.003 },
+  { estado: S.INCONCLUSIVO });
+
+/* ---- Unidades ---- */
+const SI = (Prefix) => ({ type: "IFCSIUNIT", UnitType: "LENGTHUNIT", Prefix, Name: "METRE" });
+const outras = [{ type: "IFCSIUNIT", UnitType: "AREAUNIT", Prefix: "", Name: "SQUARE_METRE" }, { type: "IFCSIUNIT", UnitType: "PLANEANGLEUNIT", Prefix: "", Name: "RADIAN" }];
+const und = (id, nome, units, esp) => verificar(id, nome, () => {
+  const u = G.resolveLengthUnit(units), sc = G.unitScaleFor(u, false);
+  const ok = u.status === esp.status && (esp.scale == null || Math.abs(sc.scale - esp.scale) < 1e-15);
+  return { ok, detalhe: `estado=${u.status} unidade=${u.label} escala=${sc.scale}` };
+});
+und("U01", "IFC em metros", [SI(""), ...outras], { status: "declarada", scale: 1 });
+und("U02", "IFC em milímetros", [SI("MILLI"), ...outras], { status: "declarada", scale: 0.001 });
+und("U03", "IFC em centímetros", [SI("CENTI"), ...outras], { status: "declarada", scale: 0.01 });
+und("U04", "IFC em quilômetros", [SI("KILO"), ...outras], { status: "declarada", scale: 1000 });
+und("U05", "IFC em decímetros", [SI("DECI"), ...outras], { status: "declarada", scale: 0.1 });
+und("U06", "Unidade de comprimento ausente", outras, { status: "ausente" });
+und("U07", "Prefixo não suportado", [SI("XYZ")], { status: "nao_suportada" });
+und("U08", "Unidade por conversão (pé = 0,3048 m)", [{ type: "IFCCONVERSIONBASEDUNIT", UnitType: "LENGTHUNIT", Name: "FOOT", ConversionFactor: { ValueComponent: 0.3048, UnitComponent: SI("") } }], { status: "declarada", scale: 0.3048 });
+und("U09", "Unidade por conversão com fator inválido", [{ type: "IFCCONVERSIONBASEDUNIT", UnitType: "LENGTHUNIT", Name: "FOOT", ConversionFactor: { ValueComponent: 0, UnitComponent: SI("") } }], { status: "nao_suportada" });
+und("U10", "Duas unidades de comprimento conflitantes", [SI("MILLI"), SI("")], { status: "ambigua" });
+verificar("U11", "Modelo pequeno declarado em milímetros (extensão 500): escala 0,001 (a heurística antiga usava 1)", () => {
+  const sc = G.unitScaleFor(G.resolveLengthUnit([SI("MILLI")]), false), ext = 500 * sc.scale, pl = G.checkScalePlausibility(ext);
+  return { ok: sc.scale === 0.001 && Math.abs(ext - 0.5) < 1e-12 && pl.ok, detalhe: `escala=${sc.scale} extensão=${ext} m plausível=${pl.ok}` };
+});
+verificar("U12", "Conversão duplicada é sinalizada (12 m já convertidos tratados como mm → 0,012 m)", () => {
+  const sc = G.unitScaleFor(G.resolveLengthUnit([SI("MILLI")]), false), pl = G.checkScalePlausibility(12 * sc.scale);
+  const semDupla = G.unitScaleFor(G.resolveLengthUnit([SI("MILLI")]), true);
+  return { ok: !pl.ok && pl.reason === "modelo_pequeno_demais" && semDupla.scale === 1, detalhe: JSON.stringify({ pl, leitorConverte: semDupla.scale }) };
+});
+
+verificar("U13", "Quem converte: extensão bruta menor que a maior extrusão ⇒ o leitor já converteu (sem conversão dupla)", () => {
+  const conv = G.detectReaderConversion(12.3, 2880, 0.001), nao = G.detectReaderConversion(12300, 2880, 0.001), sem = G.detectReaderConversion(12.3, 0, 0.001), m = G.detectReaderConversion(12.3, 2.88, 1);
+  const ok = conv.converts === true && nao.converts === false && sem.converts === null && m.converts === null
+    && G.unitScaleFor(G.resolveLengthUnit([SI("MILLI")]), conv.converts).scale === 1 && G.unitScaleFor(G.resolveLengthUnit([SI("MILLI")]), nao.converts).scale === 0.001;
+  return { ok, detalhe: JSON.stringify({ conv, nao, sem, m }) };
+});
+
+/* ---- Simplex ---- */
+const planos = (g) => G.convexInfo(mesh(g)).planes;
+const sx = (id, nome, fn) => verificar(id, nome, fn);
+sx("S01", "Convergência normal (sobreposição de 20 mm)", () => { const r = G.chebyshev(planos(F.caixa(0, 0, 0, 1, 1, 1)).concat(planos(F.caixa(0.98, 0, 0, 1.98, 1, 1))), [0.5, 0.5, 0.5]); return { ok: r.status === "otimo" && Math.abs(r.r - 0.01) < 1e-12, detalhe: JSON.stringify({ status: r.status, r: r.r, it: r.iterations }) }; });
+sx("S02", "Problema inviável (cubos separados)", () => { const r = G.chebyshev(planos(F.caixa(0, 0, 0, 1, 1, 1)).concat(planos(F.caixa(2, 0, 0, 3, 1, 1))), [0.5, 0.5, 0.5]); return { ok: r.status === "inviavel", detalhe: r.status }; });
+sx("S03", "Limite de iterações atingido: não devolve r", () => { const r = G.chebyshev(planos(F.caixa(0, 0, 0, 1, 1, 1)).concat(planos(F.caixa(0.98, 0, 0, 1.98, 1, 1))), [0.5, 0.5, 0.5], { maxIter: 1 }); return { ok: r.status === "limite_iteracoes" && r.r === null && r.x === null, detalhe: JSON.stringify(r) }; });
+sx("S04", "Falha numérica (plano com NaN)", () => { const pl = planos(F.caixa(0, 0, 0, 1, 1, 1)); pl.push([NaN, 0, 0, 1]); const r = G.chebyshev(pl, [0.5, 0.5, 0.5]); return { ok: r.status === "falha_numerica" && r.r === null, detalhe: r.status }; });
+sx("S05", "Dimensões muito pequenas (cubos de 1 mm, sobreposição de 0,1 mm)", () => { const r = G.chebyshev(planos(F.caixa(0, 0, 0, 0.001, 0.001, 0.001)).concat(planos(F.caixa(0.0009, 0, 0, 0.0019, 0.001, 0.001))), [0.0005, 0.0005, 0.0005]); return { ok: r.status === "otimo" && Math.abs(r.r - 0.00005) < 1e-12, detalhe: `r=${r.r}` }; });
+sx("S06", "Dimensões muito grandes (caixas de 2 km em coordenadas UTM, sobreposição de 20 m)", () => {
+  const X = 5e5, Y = 9e6, a = planos(F.mover(F.caixa(0, 0, 0, 2000, 2000, 2000), X, Y, 0)), b = planos(F.mover(F.caixa(1980, 0, 0, 3980, 2000, 2000), X, Y, 0));
+  const r = G.chebyshev(a.concat(b), [X + 1000, Y + 1000, 1000]); return { ok: r.status === "otimo" && Math.abs(r.r - 10) < 1e-6, detalhe: `r=${r.r} resíduo=${r.residual}` };
+});
+caso("S07", "Simplex sem convergência: evaluatePair não usa o valor e recorre ao ramo-e-limite", cubo, mesh(F.caixa(0.98, 0, 0, 1.98, 1, 1)), { kind: "hard", tol: 0.005, limits: { SIMPLEX_ITER: 1 } },
+  { estado: S.CONFIRMADO, flags: ["simplex_limite_iteracoes"], valor: [19.5, 20.0001], contemEspessura: 20 });
+
+/* ---- Classificação de malhas não sólidas ---- */
+const caixaAberta = mesh(F.removerFace(F.caixa(0, 0, 0, 1, 1, 1), 2, 1)); // sem a face z = 1
+caso("K01a", "Malha aberta sem interseção superficial e sem contenção possível", mesh(F.removerFace(F.caixa(0, 0, 0, 0.3, 3, 0.3), 1, 3)), mesh(F.cilindro([-1.2, 1, -2], [2.8, 1.4, 2.6], 0.05, 32)), { kind: "hard", tol: 0.005 },
+  { estado: S.SEM_CONFLITO, flags: ["malha_aberta_A", "ausencia_por_separacao_de_superficies"] });
+caso("K01b", "Malha aberta sem interseção superficial, com peça contida", caixaAberta, mesh(F.caixa(0.4, 0.4, 0.4, 0.6, 0.6, 0.6)), { kind: "hard", tol: 0.005 },
+  { estado: S.CONFIRMADO, flags: ["contencao_estimada"], naoEstado: [S.SEM_CONFLITO] });
+caso("K01c", "Malha aberta: tubo entra pelo furo sem cruzar superfícies (não pode virar ausência)", caixaAberta, mesh(F.cilindro([0.5, 0.5, 0.5], [0.5, 0.5, 2], 0.05, 32)), { kind: "hard", tol: 0.005 },
+  { naoEstado: [S.SEM_CONFLITO, S.CONTATO, S.ABAIXO_TOL] });
+caso("K02a", "Malha aberta com interseção superficial e espessura estimada acima da tolerância", caixaAberta, mesh(F.caixa(0.98, 0.1, 0.1, 1.98, 0.9, 0.9)), { kind: "hard", tol: 0.005 },
+  { estado: S.CONFIRMADO, flags: ["intersecao_de_superficies", "espessura_estimada"] });
+caso("K02b", "Malha aberta com interseção superficial rasa (3 mm, tol. 5): sem garantia de estar abaixo", caixaAberta, mesh(F.caixa(0.997, 0.1, 0.1, 1.997, 0.9, 0.9)), { kind: "hard", tol: 0.005 },
+  { estado: S.INCONCLUSIVO, flags: ["intersecao_de_superficies", "intersecao_sem_medida_confiavel"] });
+caso("K03a", "Malha não manifold com peça dentro da sua caixa e sem cruzamento", mesh(comAleta(F.caixa(0, 0, 0, 1, 1, 1))), mesh(F.caixa(0.4, 0.4, 0.4, 0.6, 0.6, 0.6)), { kind: "hard", tol: 0.005 },
+  { estado: S.INCONCLUSIVO, flags: ["topologia_invalida_A", "contencao_nao_verificavel"] });
+caso("K03b", "Malha não manifold com ausência aparente e separação provada", mesh(comAleta(F.caixa(0, 0, 0, 0.3, 3, 0.3))), mesh(F.cilindro([-1.2, 1, -2], [2.8, 1.4, 2.6], 0.05, 32)), { kind: "hard", tol: 0.005 },
+  { estado: S.SEM_CONFLITO, flags: ["topologia_invalida_A", "ausencia_por_separacao_de_superficies"] });
+caso("K07", "Malha aberta: folga violada é confirmada pela distância exata", caixaAberta, mesh(F.caixa(1.005, 0, 0, 2.005, 1, 1)), { kind: "clearance", tol: 0.010 },
+  { estado: S.CONFIRMADO, valor: [4.999, 5.001] });
+caso("K08", "Componentes sobrepostos no elemento: 'abaixo da tolerância' sem garantia vira inconclusivo", mesh(F.caixa(0, 0, 0, 1, 1, 1), F.caixa(0.5, 0, 0, 1.5, 1, 1), F.caixa(0, 0, 3, 0.2, 0.2, 3.2)), mesh(F.caixa(1.497, 0.2, 0.2, 2.5, 0.8, 0.8)), { kind: "hard", tol: 0.005 },
+  { naoEstado: [S.ABAIXO_TOL, S.SEM_CONFLITO, S.CONTATO] });
+
 /* ---------------- relatório ---------------- */
 const pad = (s, n) => (String(s) + " ".repeat(n)).slice(0, n);
 console.log("\nCOORDIX · testes do núcleo geométrico\n");
 for (const x of resultados) {
   const r = x.r;
-  const info = r ? `${pad(r.state, 18)} t=${r.value == null ? "—" : r.value.toFixed(3)} mm` + (r.lb != null && r.kind !== "clearance" ? ` [${r.lb.toFixed(3)}; ${r.ub.toFixed(3)}]` : "") +
+  const info = r ? `${pad(r.state, 18)} t=${r.value == null ? "—" : r.value.toFixed(3)} mm` + (r.lb != null && r.kind !== "clearance" ? ` [${r.lb.toFixed(3)}; ${r.ub == null ? "sem garantia" : r.ub.toFixed(3)}]` : "") +
     (r.volume ? ` V=[${r.volume.vmin.toExponential(3)}; ${r.volume.vmax.toExponential(3)}] m³` : "") + (r.quality !== "exata" ? " (aprox.)" : "") + ` ${x.ms.toFixed(1)} ms` : x.detalhe;
   console.log(`${x.ok ? "✔" : "✘"} ${pad(x.id, 5)} ${pad(x.nome, 72)} ${info}`);
   for (const p of x.problemas) console.log(`        ↳ ${p}`);

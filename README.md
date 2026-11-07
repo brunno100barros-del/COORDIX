@@ -16,7 +16,7 @@ A automação faz a parte repetitiva e o coordenador BIM continua responsável p
 | Visualizador | 3D com árvore modelo → pavimento → entidade, isolar, aproximar e snapshot |
 | Propriedades | Aba **Geral** no padrão Visus (Disciplina, **Entidade**, ID IFC, Layer, Pavimento, Type) e aba **PropertySets** com quantitativos e propriedades do tipo |
 | Regras de análise | Matriz de tolerância com os 21 testes do manual corporativo (interferência ou folga, em mm), filtros de exclusão por entidade ou PropertySet, ordem de flexibilidade das disciplinas e tabela de nomes de Entidade editável |
-| Clash detection | Núcleo geométrico próprio (`coordix-geometria.js`): espessura de interferência rigorosa (exata para peças convexas), volume de interseção, folga por distância exata entre malhas, contenção por número de voltas e estados de confiabilidade (confirmado, abaixo da tolerância, contato, sem conflito, inconclusivo e incompleto) |
+| Clash detection | Núcleo geométrico próprio (`coordix-geometria.js`): classificação topológica das malhas (sólido válido, aberta, inválida), espessura de interferência rigorosa (exata para peças convexas) ou estimada quando a malha não é sólida, volume de interseção, folga por distância exata, integridade geométrica por elemento, unidade declarada no IFC e estados de confiabilidade (confirmado, abaixo da tolerância, contato, sem conflito, inconclusivo e incompleto) |
 | Clashes por nível | Resultados agrupados por pavimento, aba separada de **falsos clashes** e alerta de revisão pendente |
 | Pré-classificação | Regras P1, P2, P3, P4, INFO e Falso clash com o motivo exibido, além do responsável sugerido pela disciplina que se adapta |
 | Revisão | Fila um por um, câmera no conflito (A em vermelho, B em azul), PropertySets dos dois elementos, alteração de classificação e responsável, comentários, snapshot e histórico. Atalhos: `Enter`, `F`, `1`–`5`, `←` `→` |
@@ -44,11 +44,12 @@ coordix-geometria.js             núcleo geométrico (sem dependências; navegad
 web-ifc.wasm                     motor de leitura IFC (web-ifc 0.0.39)
 exemplos/                        IFCs fictícios com conflitos planejados
 ferramentas/gerar_ifc_exemplo.py gera os IFCs de exemplo
-testes/geometria.test.js         suíte de testes geométricos (53 cenários)
+testes/geometria.test.js         suíte de testes geométricos (101 cenários)
 testes/comparativo_v1.js         comparativo com o motor da v1 nos mesmos cenários
 testes/formas.js                 geometrias sintéticas dos testes
 testes/legado_v1.js              motor da v1, preservado só para o comparativo
 docs/fase-01-relatorio.md        relatório técnico da Fase 01
+docs/fase-01-rodada-complementar.md  correções da revisão técnica da Fase 01
 ```
 
 ## Testes

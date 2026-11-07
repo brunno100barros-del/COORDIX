@@ -325,17 +325,17 @@ const RULES = [
     test:(c,A,B)=>EGRESS.has(A.cls)||EGRESS.has(B.cls)},
   {id:"r_fire", cls:"P1", cond:"Terminal de incêndio × qualquer elemento", reason:"Equipamento obstruindo sistema de combate a incêndio.",
     test:(c,A,B)=>FIRE.has(A.cls)||FIRE.has(B.cls)},
-  {id:"r_beam", cls:"P1", cond:"Viga/pilar × rede MEP com penetração > 50 mm", reason:"Tubulação ou duto atravessando viga/pilar (exemplo P1 do manual).",
+  {id:"r_beam", cls:"P1", cond:"Viga/pilar × rede MEP com espessura de interferência > 50 mm", reason:"Tubulação ou duto atravessando viga/pilar (exemplo P1 do manual).",
     test:(c,A,B)=>c.kind==="hard" && c.value>50 && ((STRUCT_PRIMARY.has(A.cls)&&isMep(B))||(STRUCT_PRIMARY.has(B.cls)&&isMep(A)))},
   {id:"r_slab", cls:"P2", cond:"Laje × rede MEP", reason:"Passagem por laje sem furo/shaft previsto — exige redefinição.",
     test:(c,A,B)=>(STRUCT_SLAB.has(A.cls)&&isMep(B))||(STRUCT_SLAB.has(B.cls)&&isMep(A))},
-  {id:"r_struct", cls:"P2", cond:"Viga/pilar × rede MEP com penetração ≤ 50 mm", reason:"Interferência com estrutura — verificar possibilidade de furo com a estrutura.",
+  {id:"r_struct", cls:"P2", cond:"Viga/pilar × rede MEP com espessura de interferência ≤ 50 mm", reason:"Interferência com estrutura — verificar possibilidade de furo com a estrutura.",
     test:(c,A,B)=>(STRUCT_PRIMARY.has(A.cls)&&isMep(B))||(STRUCT_PRIMARY.has(B.cls)&&isMep(A))},
   {id:"r_main", cls:"P2", cond:"Redes principais de disciplinas diferentes", reason:"Conflito entre redes principais — afeta mais de uma disciplina.",
     test:(c,A,B)=>LINEAR.has(A.cls)&&LINEAR.has(B.cls)&&A.code!==B.code&&mainSize(A)>60&&mainSize(B)>60},
   {id:"r_arqest", cls:"P4", cond:"Arquitetura × estrutura", reason:"Vedação encostando na estrutura — erro de modelagem sem impacto construtivo.",
     test:(c,A,B)=>(A.group==="ARQ"&&B.group==="EST")||(A.group==="EST"&&B.group==="ARQ")},
-  {id:"r_marg", cls:"P4", cond:"Penetração até 2× a tolerância", reason:"Interferência marginal, próxima da tolerância estabelecida.",
+  {id:"r_marg", cls:"P4", cond:"Espessura de interferência até 2× a tolerância", reason:"Interferência marginal, próxima da tolerância estabelecida.",
     test:(c)=>c.kind==="hard" && c.value<=2*Math.max(c.tol,5)},
   {id:"r_light", cls:"P3", cond:"Luminária × qualquer elemento", reason:"Reposicionamento de luminária.",
     test:(c,A,B)=>A.cls==="IFCLIGHTFIXTURE"||B.cls==="IFCLIGHTFIXTURE"},
@@ -563,8 +563,32 @@ function indexModel(m){
   each(T.IFCBUILDING,"IfcBuilding",l=>{if(!m.building) m.building=decIfc(val(l.Name))||""});
   m.stage="unidades";
   m.unitScale=1;
-  each(T.IFCSIUNIT,"IfcSIUnit",l=>{if(val(l.UnitType)==="LENGTHUNIT"){m.unitPrefix=val(l.Prefix)||""}});
-  if(T.IFCCONVERSIONBASEDUNIT!=null) each(T.IFCCONVERSIONBASEDUNIT,"IfcConversionBasedUnit",l=>{if(val(l.UnitType)==="LENGTHUNIT") m.unitConv=decIfc(val(l.Name))||"convertida"});
+  // unidade de comprimento DECLARADA: IfcProject.UnitsInContext → IfcUnitAssignment.Units
+  // Unidades: no web-ifc 0.0.39 os atributos de IfcSIUnit chegam deslocados (UnitType vazio,
+  // Prefix = "LENGTHUNIT", Name = "MILLI"). A leitura identifica cada campo pelo VALOR, sem depender
+  // da posição: termina em UNIT → tipo; prefixo SI → prefixo; METRE/… → nome.
+  const SI_PREFIXES=["EXA","PETA","TERA","GIGA","MEGA","KILO","HECTO","DECA","DECI","CENTI","MILLI","MICRO","NANO","PICO","FEMTO","ATTO"];
+  const enumsOf=(l)=>Object.keys(l).filter(k=>k!=="type"&&k!=="expressID").map(k=>val(l[k])).filter(v=>typeof v==="string");
+  const plainSI=(l)=>{const e=enumsOf(l);return {type:TYPE_NAME[l.type]||"",UnitType:e.find(v=>/UNIT$/.test(v)),Prefix:e.find(v=>SI_PREFIXES.includes(v))||"",Name:e.find(v=>!/UNIT$/.test(v)&&!SI_PREFIXES.includes(v))}};
+  const plainUnit=(id)=>{let l;try{l=line(id)}catch(e){return null}
+    const tn=TYPE_NAME[l.type]||"";
+    if(tn==="IFCSIUNIT") return plainSI(l);
+    if(tn==="IFCCONVERSIONBASEDUNIT"){const e=enumsOf(l);const o={type:tn,UnitType:e.find(v=>/UNIT$/.test(v)),Name:decIfc(e.find(v=>!/UNIT$/.test(v))||""),ConversionFactor:{}};
+      try{const ref=Object.keys(l).map(k=>l[k]).find(v=>v&&typeof v==="object"&&v.type===5&&(TYPE_NAME[line(v.value).type]||"")==="IFCMEASUREWITHUNIT");
+        const cf=line(ref.value);const keys=Object.keys(cf).filter(k=>k!=="type"&&k!=="expressID");
+        const num=keys.map(k=>cf[k]).map(v=>val(v)).find(v=>typeof v==="number");
+        const ucRef=keys.map(k=>cf[k]).find(v=>v&&typeof v==="object"&&v.type===5);
+        o.ConversionFactor={ValueComponent:Number(num),UnitComponent:ucRef?plainSI(line(ucRef.value)):{}}}catch(e){}
+      return o}
+    return {type:tn,UnitType:enumsOf(l).find(v=>/UNIT$/.test(v))};
+  };
+  const units=[];
+  for(const pid of ids(T.IFCPROJECT)){try{const pl=line(pid);const ua=val(pl.UnitsInContext);if(ua==null) continue;
+    const al=line(ua);for(const u of al.Units||[]){const o=plainUnit(val(u));if(o) units.push(o)}}catch(e){skip("IfcUnitAssignment",e)}}
+  m.lengthUnit=GEOC.resolveLengthUnit(units);
+  // referência independente para verificar se o leitor converteu a geometria: maior profundidade de extrusão
+  m.maxExtrusionDepth=0;
+  {let n=0;for(const id of ids(T.IFCEXTRUDEDAREASOLID)){if(++n>5000) break;try{const d=Number(val(line(id).Depth));if(d>m.maxExtrusionDepth) m.maxExtrusionDepth=d}catch(e){}}}
 }
 function storeyOf(m,eid){
   let cur=eid;for(let i=0;i<12&&cur!=null;i++){
@@ -576,40 +600,63 @@ function storeyOf(m,eid){
 }
 
 function buildGeometry(m){
-  const mid=m.mid;
+  const mid=m.mid,T=WEBIFC;
+  const ids=code=>code==null?[]:vec(api.GetLineIDsWithType(mid,code));
   const perEl=new Map(); // eid → {geoms:[{p,n,i,color}]}
   let origin=null;
   let rawMin=[Infinity,Infinity,Infinity],rawMax=[-Infinity,-Infinity,-Infinity];
   m.stage="geometria";
+  m.geoFailures=[];m.unprocessed=[];
+  const reader={
+    getGeometry:(pg)=>api.GetGeometry(mid,pg.geometryExpressID),
+    getVertices:(g)=>api.GetVertexArray(g.GetVertexData(),g.GetVertexDataSize()),
+    getIndices:(g)=>api.GetIndexArray(g.GetIndexData(),g.GetIndexDataSize()),
+    release:(g)=>{if(g&&g.delete) g.delete()},
+    transform:(pg)=>pg.flatTransformation,
+  };
   api.StreamAllMeshes(mid,(fm)=>{
-    const eid=fm.expressID;const gs=fm.geometries;const n=gs.size();
-    for(let gi=0;gi<n;gi++){
-     try{
-      const pg=gs.get(gi);
-      const g=api.GetGeometry(mid,pg.geometryExpressID);
-      const vd=api.GetVertexArray(g.GetVertexData(),g.GetVertexDataSize());
-      const id=api.GetIndexArray(g.GetIndexData(),g.GetIndexDataSize());
-      const t=pg.flatTransformation;
-      const {P:W,N}=GEOC.transformVertexData(vd,t); // posições mundiais em Float64, na unidade do arquivo
+    const eid=fm.expressID;
+    let refs=[];
+    try{const gs=fm.geometries;const n=gs.size();for(let gi=0;gi<n;gi++) refs.push(gs.get(gi))}
+    catch(e){m.unprocessed.push({eid,reason:"falha ao listar as representações: "+(e.message||e)});return}
+    const r=GEOC.readElementGeometries(refs,reader); // cada falha é registrada; recursos liberados em finally
+    for(const f of r.failures) m.geoFailures.push({eid,geometryExpressID:f.ref&&f.ref.geometryExpressID,stage:f.stage,reason:f.reason});
+    if(!r.geoms.length){m.unprocessed.push({eid,reason:r.failures.map(f=>`${f.stage}: ${f.reason}`).join("; ")||"sem representação"});return}
+    for(const g of r.geoms){
+      const c=g.ref.color;g.c=[c.x,c.y,c.z,c.w];delete g.ref;
+      const W=g.w;
       for(let k=0;k<W.length;k+=3){const X=W[k],Y=W[k+1],Z=W[k+2];
         if(X<rawMin[0])rawMin[0]=X;if(Y<rawMin[1])rawMin[1]=Y;if(Z<rawMin[2])rawMin[2]=Z;
         if(X>rawMax[0])rawMax[0]=X;if(Y>rawMax[1])rawMax[1]=Y;if(Z>rawMax[2])rawMax[2]=Z;
         if(!origin) origin=[X,Y,Z]}
-      const c=pg.color;
-      const rec=perEl.get(eid)||{geoms:[]};rec.geoms.push({w:W,n:N,i:new Uint32Array(id),c:[c.x,c.y,c.z,c.w]});perEl.set(eid,rec);
-      if(g.delete) try{g.delete()}catch(e){}
-     }catch(e){m.skipped=m.skipped||{};m.skipped["geometria"]=(m.skipped["geometria"]||0)+1;if(m.skipped["geometria"]===1) console.warn("COORDIX: geometria ignorada",e)}
     }
+    perEl.set(eid,{geoms:r.geoms,integrity:r.integrity,failures:r.failures.map(f=>({geometryExpressID:f.ref&&f.ref.geometryExpressID,stage:f.stage,reason:f.reason}))});
   });
+  // produtos com representação para os quais o leitor não gerou nenhuma malha (não podem sumir em silêncio)
+  for(const cls of Object.keys(DEFAULT_ENTITY_NAMES)){
+    if(cls==="IFCOPENINGELEMENT"||cls==="IFCSPACE"||T[cls]==null) continue;
+    let idsC=[];try{idsC=ids(T[cls])}catch(e){continue}
+    for(const id of idsC){if(perEl.has(id)||m.unprocessed.some(u=>u.eid===id)) continue;
+      try{const l=api.GetLine(mid,id,false);if(val(l.Representation)!=null) m.unprocessed.push({eid:id,reason:"o leitor não gerou malha para a representação"})}catch(e){}}
+  }
+  for(const u of m.unprocessed){try{const l=api.GetLine(mid,u.eid,false);u.guid=val(l.GlobalId)||"";u.cls=TYPE_NAME[l.type]||"";u.name=decIfc(val(l.Name))||""}catch(e){u.guid="";u.cls=""}}
   m.stage="elementos";
   if(!origin){m.empty=true;return}
   // unidade → metros (centralizado no núcleo); coordenadas relativas à origem comum do projeto, em Float64
   const ext=Math.max(rawMax[0]-rawMin[0],rawMax[1]-rawMin[1],rawMax[2]-rawMin[2]);
-  const us=GEOC.unitScaleFor(m.unitPrefix,ext);let s=us.scale;
-  m.unitScale=s;m.unitInfo=us;m.rawOrigin=origin;m.geoFlags=m.geoFlags||[];
-  if(m.unitConv){m.unitUnsupported=true;m.geoFlags.push(`Unidade de comprimento ${m.unitConv} não suportada: resultados geométricos marcados como inconclusivos`)}
-  else if(us.unknown){m.unitUnsupported=true;m.geoFlags.push(`Prefixo de unidade desconhecido (${m.unitPrefix}): resultados geométricos marcados como inconclusivos`)}
-  else if(us.assumed&&m.unitPrefix) m.geoFlags.push(`Unidade ${m.unitPrefix==="MILLI"?"milímetro":m.unitPrefix}: geometria tratada como já convertida para metros (extensão ${fmt(ext,1)})`);
+  // escala: unidade DECLARADA + verificação de quem converte (leitor ou COORDIX), sem conversão dupla
+  const lu=m.lengthUnit||{status:"ausente"};
+  const det=GEOC.detectReaderConversion(ext,m.maxExtrusionDepth,lu.scale);
+  const readerConverts=det.converts!=null?det.converts:GEOC.READER_CONVERTS_UNITS;
+  const us=GEOC.unitScaleFor(lu,readerConverts);let s=us.scale;
+  m.unitScale=s;m.unitInfo=Object.assign({},us,{readerConverts,check:det});m.rawOrigin=origin;m.geoFlags=m.geoFlags||[];m.lengthScale=us.declaredScale||1;
+  if(us.status!=="declarada"){m.unitUnsupported=true;m.geoFlags.push(us.status==="ausente"?"O arquivo não declara unidade de comprimento: resultados geométricos marcados como inconclusivos":us.status==="ambigua"?`Unidades de comprimento conflitantes (${us.label}): resultados geométricos marcados como inconclusivos`:`Unidade de comprimento não suportada (${us.label}): resultados geométricos marcados como inconclusivos`)}
+  else{
+    if(det.converts===null&&Math.abs((lu.scale||1)-1)>1e-12) m.geoFlags.push(`Conversão de unidade pelo leitor assumida (comportamento do web-ifc 0.0.39); não foi possível verificá-la neste arquivo`);
+    const pl=GEOC.checkScalePlausibility(ext*s);
+    if(!pl.ok){m.unitUnsupported=true;m.geoFlags.push(`Escala suspeita: com a unidade declarada (${us.label}) o modelo mede ${fmt(ext*s,3)} m — possível conversão duplicada; resultados marcados como inconclusivos`)}
+  }
+  m.unitLabel=us.label;
   const o=[origin[0]*s,origin[1]*s,origin[2]*s];
   if(!GLOBAL_OFFSET) GLOBAL_OFFSET=o.map(v=>Math.round(v));
   let farMax=0;
@@ -620,7 +667,7 @@ function buildGeometry(m){
     g.p64=P64;g.p=Float32Array.from(P64);delete g.w; // p (Float32) só para desenho e seleção; p64 para a análise
   }
   if(farMax>GEOC.GEO.FAR_COORD) m.geoFlags.push(`Coordenadas a ${fmt(farMax/1000,1)} km da origem comum do projeto: a visualização perde precisão; a análise geométrica usa precisão dupla`);
-  m.storeysY=m.storeys.map(st=>({...st,y:st.elev*(m.unitPrefix==="MILLI"?0.001:m.unitPrefix==="CENTI"?0.01:1)-GLOBAL_OFFSET[1]}));
+  m.storeysY=m.storeys.map(st=>({...st,y:st.elev*m.lengthScale-GLOBAL_OFFSET[1]}));
   const chunks=new Map();
   for(const [eid,rec] of perEl){
     let l;try{l=api.GetLine(mid,eid,false)}catch(e){m.skipped["elemento sem atributos"]=(m.skipped["elemento sem atributos"]||0)+1;l={type:null,expressID:eid}}
@@ -636,7 +683,8 @@ function buildGeometry(m){
     const sz=box.getSize(new THREE.Vector3());
     const el={idx:ELEMS.length,model:m.id,m,eid,cls,guid:val(l.GlobalId)||"",name:decIfc(val(l.Name))||"",objType:decIfc(val(l.ObjectType))||"",
       tag:decIfc(val(l.Tag))||"",predef:val(l.PredefinedType)||"",typeName,storey:storeyOf(m,eid),system:m.systemOf[eid]||"",
-      group:m.group,code:m.code,box,size:[sz.x*1000,sz.y*1000,sz.z*1000],geoms:rec.geoms,rep:val(l.Representation)};
+      group:m.group,code:m.code,box,size:[sz.x*1000,sz.y*1000,sz.z*1000],geoms:rec.geoms,rep:val(l.Representation),
+      geoIntegrity:rec.integrity,geoFailures:rec.failures};
     ELEMS.push(el);m.elems.push(el.idx);
     for(const g of rec.geoms){
       const key=g.c.map(v=>v.toFixed(3)).join(",");
@@ -790,7 +838,9 @@ function visusFields(el){
 }
 function extraFields(el){
   return [["Nome",el.name],["Classe IFC",ifcPretty(el.cls)],["PredefinedType",el.predef],["Sistema",el.system],["Tag",el.tag],
-    ["Dimensões (mm)",el.size.map(v=>fmt(v)).join(" × ")]];
+    ["Dimensões (mm)",el.size.map(v=>fmt(v)).join(" × ")],
+    ["Integridade geométrica",el.geoIntegrity==="parcial"?`parcial — ${(el.geoFailures||[]).length} representação(ões) não lida(s)`:el.geoIntegrity==="completa"?"completa":""],
+    ["Topologia da malha",el._solid?({solido_valido:"sólido válido",aberta:"malha aberta",invalida:"malha inválida",superficie:"superfície sem volume"}[el._solid.topology]||el._solid.topology):""]];
 }
 
 /* ===================================================================== */
@@ -834,19 +884,34 @@ const GEO_FLAG={
   limite_pares_triangulos:"limite de pares de triângulos atingido",limite_pontos_prova:"limite de pontos de prova atingido",limite_pares_distancia:"limite de pares no cálculo da distância",
   distancia_pode_ser_menor:"a distância real pode ser ainda menor (limite atingido)",profundidade_indeterminada:"superfícies se cruzam, mas a profundidade não pode ser medida",
   contencao_verificada_aproximadamente:"contenção verificada de forma aproximada",contato_nao_verificado:"contato não verificado (limite)",interpenetracao:"os elementos se interpenetram",
-  distancia_maior_que_folga:"distância maior que a folga exigida",contencao_nao_verificada:"contenção não verificada",unidade_nao_suportada:"unidade de comprimento não suportada no modelo",
+  distancia_maior_que_folga:"distância maior que a folga exigida",contencao_nao_verificada:"contenção não verificada",unidade_nao_suportada:"unidade de comprimento não confirmada no modelo: a escala é desconhecida",
+  topologia_invalida:"malha inválida (não é um sólido confiável)",arestas_nao_manifold:"arestas compartilhadas por mais de duas faces",vertices_nao_manifold:"vértices não manifold",
+  geometria_incompleta:"geometria do elemento lida só em parte",ausencia_nao_confirmada_geometria_incompleta:"a ausência de conflito não pode ser confirmada: falta parte da geometria",
+  representacao_completa_nao_validada:"conflito confirmado na parte lida; a representação completa não foi validada",
+  intersecao_de_superficies:"as superfícies se cruzam (evidência direta de interferência)",intersecao_sem_medida_confiavel:"as superfícies se cruzam, mas a espessura não pode ser medida com segurança",
+  espessura_estimada:"espessura estimada, sem garantia matemática",contencao_estimada:"elemento provavelmente contido no outro (estimativa)",
+  ausencia_por_separacao_de_superficies:"ausência provada pela separação das superfícies (nenhuma peça pode estar contida na outra)",
+  furo_da_malha_junto_a_outra_peca:"a malha tem um furo junto à outra peça: não é possível provar a separação",contencao_nao_verificavel:"uma peça pode estar contida na outra e a malha não permite verificar",
+  limite_superior_nao_garantido:"sem limite superior garantido: não é possível afirmar que está abaixo da tolerância",componentes_sobrepostos_no_elemento:"o elemento tem partes sobrepostas: o limite superior não é garantido",
+  simplex_inviavel:"o cálculo exato (programação linear) não encontrou interior comum: usado o cálculo por limites",simplex_ilimitado:"cálculo exato sem solução limitada: usado o cálculo por limites",
+  simplex_limite_iteracoes:"o cálculo exato não convergiu no limite de iterações: usado o cálculo por limites",simplex_falha_numerica:"falha numérica no cálculo exato: usado o cálculo por limites",
 };
+const METRIC_LABEL={garantida:"garantida",estimada:"estimada (sem garantia)",indisponivel:"não disponível"};
 function geoFlagText(f){const m=f.match(/^(.*)_([AB])$/);return m&&GEO_FLAG[m[1]]?`${GEO_FLAG[m[1]]} (${m[2]})`:(GEO_FLAG[f]||f)}
-function solidOf(el){if(!el._solid) el._solid=GEOC.prepareMesh(el.geoms);return el._solid}
+function solidOf(el){if(!el._solid) el._solid=GEOC.prepareMesh(el.geoms,{incomplete:el.geoIntegrity!=="completa"});return el._solid}
 function geoValueText(c){
   if(c.value==null) return "—";
   const g=c.geo||{};
-  if(c.kind==="hard") return (g.ub!=null&&g.lb!=null&&g.ub-g.lb>0.0005?"≥ ":"")+fmt(c.value,1)+" mm";
+  if(c.kind==="hard"){
+    if(g.metricQuality==="estimada") return "≈ "+fmt(c.value,1)+" mm";
+    return ((g.lb!=null&&(g.ub==null||g.ub-g.lb>0.0005))?"≥ ":"")+fmt(c.value,1)+" mm";
+  }
   return "folga "+fmt(c.value,1)+" mm";
 }
 function geoChip(c){
   const g=c.geo;if(!g) return "";
   if(g.state!=="confirmado") return ` <span class="chip geo" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">${esc(GEO_LABEL[g.state]||g.state)}</span>`;
+  if(g.metricQuality==="estimada") return ` <span class="chip outline" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">estimado</span>`;
   return g.quality==="aproximada"?` <span class="chip outline" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">aprox.</span>`:"";
 }
 function runAnalysis(){
@@ -876,17 +941,24 @@ function runAnalysis(){
         if(ox<-pad||oy<-pad||oz<-pad) continue;
         if(t.kind==="hard"&&(ox<=0||oy<=0||oz<=0)) continue;
         const key=a.idx<b.idx?a.idx+"|"+b.idx:b.idx+"|"+a.idx; // por índice: GUIDs repetidos não somem da análise
-        if(found.has(key)||checked.has(key+"|"+t.id)) continue;
+        if(checked.has(key+"|"+t.id)) continue;
         checked.add(key+"|"+t.id);nNarrow++;
         const r=GEOC.evaluatePair(solidOf(a),solidOf(b),{kind:t.kind,tol,volume:false}); // volume: calculado ao abrir o clash
-        if((a.m.unitUnsupported||b.m.unitUnsupported)&&r.state!=="confirmado"&&r.state!=="incompleto"){r.state="inconclusivo";r.flags.push("unidade_nao_suportada")}
+        // unidade não confirmada: a escala é desconhecida, então nenhuma comparação com a tolerância vale
+        if((a.m.unitUnsupported||b.m.unitUnsupported)&&r.state!=="incompleto"){r.state="inconclusivo";r.metricQuality="indisponivel";r.flags.push("unidade_nao_suportada")}
         geoStats[r.state]=(geoStats[r.state]||0)+1;
         if(r.state==="sem_conflito"||r.state==="contato"){if(t.kind==="hard") rejected++;continue}
         if(r.state==="abaixo_tolerancia"){below++;continue}
         // confirmado, inconclusivo e incompleto entram na lista: nunca são tratados como ausência de conflito
         const value=r.value==null?null:Math.round(r.value*1e4)/10;
-        found.set(key,{id:key,key:pairKey(a,b),a:a.idx,b:b.idx,test:t.id,testName:`${GROUPS[t.a]} × ${GROUPS[t.b]}`,kind:t.kind,tol:t.tol,value,center:r.center,
-          geo:{state:r.state,lb:r.lb,ub:r.ub,volume:r.volume,extent:r.extent,quality:r.quality,flags:r.flags,method:r.method}});
+        const item={id:key,key:pairKey(a,b),a:a.idx,b:b.idx,test:t.id,testName:`${GROUPS[t.a]} × ${GROUPS[t.b]}`,kind:t.kind,tol:t.tol,value,center:r.center,
+          geo:{state:r.state,lb:r.lb,ub:r.ub,volume:r.volume,extent:r.extent,quality:r.quality,flags:r.flags,method:r.method,metricQuality:r.metricQuality,evidence:r.evidence,bounds:r.bounds}};
+        // consolidação: o mesmo par em vários testes mantém o resultado mais relevante e confiável
+        // (confirmado > inconclusivo/incompleto); um inconclusivo nunca é trocado por ausência
+        const prev=found.get(key);
+        if(prev){const rank=x=>x.geo.state==="confirmado"?2:1;const keep=rank(item)>rank(prev)?item:prev,other=keep===item?prev:item;
+          keep.geo.otherTests=[...(keep.geo.otherTests||[]),...(other.geo.otherTests||[]),{testName:other.testName,state:other.geo.state,tol:other.tol}];found.set(key,keep);continue}
+        found.set(key,item);
       }
     }
   }
@@ -895,15 +967,25 @@ function runAnalysis(){
   list.sort((x,y)=>levelRank(x.level)-levelRank(y.level)||CLS_ORDER.indexOf(x.cls)-CLS_ORDER.indexOf(y.cls));
   S.clashes[P.id]=list;
   S.lastRun[P.id]={date:new Date().toISOString(),ms:Math.round(performance.now()-t0),elements:all.length,pool:pool.length,excluded,below,rejected,narrow:nNarrow,tests:tests.length,geo:geoStats,
-    missing:models.filter(m=>m.skipped&&m.skipped.geometria).map(m=>({file:m.file,n:m.skipped.geometria})),unitIssues:models.filter(m=>m.unitUnsupported).map(m=>m.file)};
+    missing:models.filter(m=>(m.unprocessed||[]).length).map(m=>({file:m.file,n:m.unprocessed.length,items:m.unprocessed.slice(0,200)})),
+    partial:pool.filter(e=>e.geoIntegrity==="parcial").map(e=>({file:e.m.file,guid:e.guid,eid:e.eid,cls:e.cls,failures:e.geoFailures})),
+    topology:topologyStats(pool),unitIssues:models.filter(m=>m.unitUnsupported).map(m=>m.file)};
+  // histórico de análises do projeto (persistido)
+  const lr=S.lastRun[P.id];
+  P.runLog=[...(P.runLog||[]),{date:lr.date,tests:lr.tests,pairs:nNarrow,listed:list.length,geo:geoStats,partial:lr.partial.length,missing:lr.missing.reduce((s,x)=>s+x.n,0),topology:lr.topology}].slice(-20);save();
   renderAll();
   const pend=list.filter(c=>c.state!=="validado").length;
   const doubt=(geoStats.inconclusivo||0)+(geoStats.incompleto||0);
   toast(`${list.length} clashes encontrados · ${pend} aguardando sua revisão${doubt?` · ${doubt} com resultado geométrico a verificar`:""}.`);
 }
+function topologyStats(pool){
+  const st={solido_valido:0,aberta:0,invalida:0,superficie:0,vazia:0,nao_avaliado:0};
+  for(const e of pool){if(!e._solid){st.nao_avaliado++;continue}st[e._solid.topology]=(st[e._solid.topology]||0)+1}
+  return st;
+}
 function levelOrder(){
   const P=proj();const ms=(S.models[P.id]||[]).filter(m=>m.storeys);
-  const map=new Map();for(const m of ms) for(const s of m.storeys) if(!map.has(s.name)||map.get(s.name)>s.elev*(m.unitScale||1)) map.set(s.name,s.elev*(m.unitPrefix==="MILLI"?0.001:1));
+  const map=new Map();for(const m of ms) for(const s of m.storeys) if(!map.has(s.name)||map.get(s.name)>s.elev*(m.lengthScale||1)) map.set(s.name,s.elev*(m.lengthScale||1));
   return [...map.entries()].sort((a,b)=>a[1]-b[1]).map(e=>e[0]);
 }
 function levelRank(name){const o=levelOrder();const i=o.indexOf(name);return i<0?999:i}
@@ -1065,7 +1147,7 @@ function viewModelos(){
           <td style="min-width:200px"><select data-disc="${m.id}" aria-label="Disciplina">${discOpts(m.code)}</select></td>
           <td class="num">${m.status==="pronto"?fmt(m.elems.length):"—"}</td>
           <td style="font-size:12.5px">${(m.storeys||[]).map(s=>esc(s.name)).join(", ")||"—"}</td>
-          <td>${m.status==="pronto"?'<span class="chip ok">Lido</span>'+(m.skipped&&Object.keys(m.skipped).length?`<div class="muted" style="font-size:12px;margin-top:4px" title="Entidades que o leitor não conseguiu interpretar e pulou">Ignorados: ${Object.entries(m.skipped).map(([k,n])=>esc(k)+" ("+n+")").join(", ")}</div>`:"")+(m.schema?`<div class="muted mono" style="margin-top:2px">${esc(m.schema)}</div>`:"")+(m.geoFlags&&m.geoFlags.length?m.geoFlags.map(f=>`<div style="font-size:12px;margin-top:4px;color:var(--p2)">${esc(f)}</div>`).join(""):""):m.status==="erro"?`<span class="chip P1" title="${esc(m.error)}">Erro</span> <span class="muted" style="font-size:12px">${esc(m.error)}</span>`:`<div class="prog"><i style="width:${Math.max(8,m.progress*100)}%"></i></div>`}</td>
+          <td>${m.status==="pronto"?'<span class="chip ok">Lido</span>'+(m.skipped&&Object.keys(m.skipped).length?`<div class="muted" style="font-size:12px;margin-top:4px" title="Entidades que o leitor não conseguiu interpretar e pulou">Ignorados: ${Object.entries(m.skipped).map(([k,n])=>esc(k)+" ("+n+")").join(", ")}</div>`:"")+(m.schema?`<div class="muted mono" style="margin-top:2px">${esc(m.schema)}</div>`:"")+(m.unitLabel?`<div class="muted" style="font-size:12px;margin-top:2px">Unidade: ${esc(m.unitLabel)}${m.unitInfo&&m.unitInfo.status==="declarada"?" (declarada)":""}</div>`:"")+((m.unprocessed||[]).length||(m.geoFailures||[]).length?`<div style="font-size:12px;margin-top:4px;color:var(--p2)">${(m.unprocessed||[]).length} elemento(s) sem geometria · ${m.elems.filter(i=>ELEMS[i].geoIntegrity==="parcial").length} com geometria parcial</div>`:"")+(m.geoFlags&&m.geoFlags.length?m.geoFlags.map(f=>`<div style="font-size:12px;margin-top:4px;color:var(--p2)">${esc(f)}</div>`).join(""):""):m.status==="erro"?`<span class="chip P1" title="${esc(m.error)}">Erro</span> <span class="muted" style="font-size:12px">${esc(m.error)}</span>`:`<div class="prog"><i style="width:${Math.max(8,m.progress*100)}%"></i></div>`}</td>
           <td class="tight"><input type="checkbox" data-vis="${m.id}" ${m.visible?"checked":""} aria-label="Visível"></td>
           <td class="tight"><button class="btn small ghost" data-rm-model="${m.id}">Remover</button></td></tr>`).join("")}</tbody></table></div>`
       :`<div class="empty">Nenhum modelo neste projeto ainda.</div>`}
@@ -1141,7 +1223,7 @@ function viewRegras(){
           <td><select data-tf="kind"><option value="hard" ${t.kind==="hard"?"selected":""}>Interferência</option><option value="clearance" ${t.kind==="clearance"?"selected":""}>Folga</option></select></td>
           <td style="width:110px"><input type="number" min="0" step="1" data-tf="tol" value="${t.tol}" aria-label="Tolerância"></td>
           <td style="font-size:12.5px">${esc(t.fonte||"Projeto")}</td><td style="font-size:12.5px">${esc(t.just||"")}</td></tr>`).join("")}</tbody></table></div>
-      <p class="muted" style="font-size:12.5px;margin:10px 0 0"><b>Interferência:</b> conta quando a penetração passa da tolerância (abaixo dela é tolerável, P4 do manual). <b>Folga:</b> conta quando a distância entre os elementos é menor que a tolerância.</p>
+      <p class="muted" style="font-size:12.5px;margin:10px 0 0"><b>Interferência:</b> conta quando a espessura de interferência passa da tolerância (abaixo dela é tolerável, P4 do manual). <b>Folga:</b> conta quando a distância entre os elementos é menor que a tolerância.</p>
     </div>
 
     <div class="grid2">
@@ -1191,8 +1273,17 @@ function geoSummary(run){
   if(!run.geo) return "";
   const g=run.geo,order=["confirmado","abaixo_tolerancia","contato","sem_conflito","inconclusivo","incompleto"];
   const parts=order.filter(k=>g[k]).map(k=>`<span class="num">${g[k]}</span> ${GEO_LABEL[k].toLowerCase()}`);
-  const warn=[...(run.missing||[]).map(x=>`${x.n} geometrias de ${esc(x.file)} não puderam ser lidas e ficaram fora da análise`),...(run.unitIssues||[]).map(f=>`unidade não suportada em ${esc(f)}`)];
-  return `<div class="muted" style="font-size:12.5px">Pares verificados na geometria: ${parts.join(" · ")||"nenhum"}</div>${warn.length?`<div style="font-size:12.5px;color:var(--p2)">${warn.join(" · ")}</div>`:""}`;
+  const warn=[...(run.missing||[]).map(x=>`${x.n} elemento(s) de ${esc(x.file)} sem geometria processada ficaram fora da análise`),
+    ...((run.partial||[]).length?[`${run.partial.length} elemento(s) com geometria parcial: ausência de conflito não é confirmada para eles`]:[]),
+    ...(run.unitIssues||[]).map(f=>`unidade não confirmada em ${esc(f)}`)];
+  const tp=run.topology||{};
+  const topo=[["solido_valido","sólidos válidos"],["aberta","malhas abertas"],["invalida","malhas inválidas"],["superficie","superfícies sem volume"]].filter(([k])=>tp[k]).map(([k,l])=>`<span class="num">${tp[k]}</span> ${l}`).join(" · ");
+  const lista=[...(run.missing||[]).flatMap(x=>x.items.map(u=>({file:x.file,guid:u.guid,cls:u.cls,eid:u.eid,motivo:"não processado — "+u.reason}))),
+    ...(run.partial||[]).map(p=>({file:p.file,guid:p.guid,cls:p.cls,eid:p.eid,motivo:"parcial — "+p.failures.map(f=>`${f.stage}: ${f.reason}`).join("; ")}))];
+  const P=proj(),hist=(P.runLog||[]).slice(-5).reverse();
+  return `<div class="muted" style="font-size:12.5px">Pares verificados na geometria: ${parts.join(" · ")||"nenhum"}${topo?` · Elementos analisados: ${topo}`:""}</div>${warn.length?`<div style="font-size:12.5px;color:var(--p2)">${warn.join(" · ")}</div>`:""}
+    ${lista.length?`<details style="font-size:12.5px"><summary class="muted" style="cursor:pointer">Elementos com falha de geometria (${lista.length})</summary><div class="tbl-wrap"><table><thead><tr><th>Arquivo</th><th>GUID</th><th>Entidade</th><th>#</th><th>Situação</th></tr></thead><tbody>${lista.slice(0,300).map(x=>`<tr><td>${esc(x.file)}</td><td class="mono">${esc(x.guid||"—")}</td><td>${esc(x.cls?entityName(x.cls):"—")}</td><td class="num">${x.eid}</td><td>${esc(x.motivo)}</td></tr>`).join("")}</tbody></table></div></details>`:""}
+    ${hist.length>1?`<details style="font-size:12.5px"><summary class="muted" style="cursor:pointer">Histórico de análises (${(P.runLog||[]).length})</summary><div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Pares</th><th>Listados</th><th>Confirmados</th><th>Inconclusivos</th><th>Incompletos</th><th>Geometria parcial / ausente</th></tr></thead><tbody>${hist.map(h=>`<tr><td class="num">${dateBR(h.date)}</td><td class="num">${h.pairs}</td><td class="num">${h.listed}</td><td class="num">${(h.geo||{}).confirmado||0}</td><td class="num">${(h.geo||{}).inconclusivo||0}</td><td class="num">${(h.geo||{}).incompleto||0}</td><td class="num">${h.partial||0} / ${h.missing||0}</td></tr>`).join("")}</tbody></table></div></details>`:""}`;
 }
 /* ---------- 5. Clashes por nível ---------- */
 function viewClashes(){
@@ -1256,11 +1347,17 @@ function renderQueue(){
 function geoDetails(c){
   const g=c.geo;if(!g) return "";
   if(c.kind==="hard"&&g.state==="confirmado"&&!g.volume&&ELEMS[c.a].geoms.length&&ELEMS[c.b].geoms.length){
-    try{const v=GEOC.pairVolume(solidOf(ELEMS[c.a]),solidOf(ELEMS[c.b]),20000);g.volume={vmin:v.vmin,vmax:v.vmax};g.extent=v.extent;if(!v.exact&&v.vmax-v.vmin>1e-12&&!g.flags.includes("volume_por_intervalo")) g.flags.push("volume_por_intervalo")}catch(e){console.warn("COORDIX: volume",e)}
+    try{const v=g.metricQuality==="garantida"?GEOC.pairVolume(solidOf(ELEMS[c.a]),solidOf(ELEMS[c.b]),20000):null; // volume só com garantia
+      if(v){g.volume={vmin:v.vmin,vmax:v.vmax};g.extent=v.extent;if(!v.exact&&v.vmax-v.vmin>1e-12&&!g.flags.includes("volume_por_intervalo")) g.flags.push("volume_por_intervalo")}else g.volume=null}catch(e){console.warn("COORDIX: volume",e)}
   }
   const m3=v=>v>=1e-3?fmt(v*1000,2)+" L":fmt(v*1e6,1)+" cm³";
   const rows=[`<span>Resultado geométrico</span><span>${esc(GEO_LABEL[g.state]||g.state)}${g.quality==="aproximada"?' <span class="chip outline">aproximado</span>':""}${g.method==="convexo_exato"?' <span class="muted" style="font-size:12px">· cálculo exato (peças convexas)</span>':g.method==="ramo_e_limite"?' <span class="muted" style="font-size:12px">· cálculo por limites</span>':""}</span>`];
-  if(c.kind==="hard"&&g.lb!=null&&g.ub!=null&&g.ub-g.lb>0.0005) rows.push(`<span>Intervalo da espessura</span><span class="num">${fmt(g.lb*1000,1)} a ${fmt(g.ub*1000,1)} mm</span>`);
+  if(c.kind==="hard"&&g.metricQuality) rows.push(`<span>Confiabilidade da espessura</span><span>${esc(METRIC_LABEL[g.metricQuality]||g.metricQuality)}${g.evidence==="superficies"?' <span class="muted" style="font-size:12px">· só as superfícies puderam ser comparadas</span>':""}</span>`);
+  if(c.kind==="hard"&&g.lb!=null&&g.ub!=null&&g.ub-g.lb>0.0005&&g.metricQuality==="garantida") rows.push(`<span>Intervalo da espessura</span><span class="num">${fmt(g.lb*1000,1)} a ${fmt(g.ub*1000,1)} mm</span>`);
+  if(c.kind==="hard"&&g.lb!=null&&g.ub==null&&g.metricQuality==="garantida") rows.push(`<span>Intervalo da espessura</span><span class="num">pelo menos ${fmt(g.lb*1000,1)} mm <span class="muted" style="font-size:12px">(sem limite superior garantido)</span></span>`);
+  const integ=[c.a,c.b].map((i,k)=>{const e=ELEMS[i];return e.geoIntegrity&&e.geoIntegrity!=="completa"?`${k?"B":"A"}: geometria ${e.geoIntegrity==="parcial"?"parcial":"não processada"} (${(e.geoFailures||[]).length} falha(s))`:""}).filter(Boolean);
+  if(integ.length) rows.push(`<span>Integridade</span><span style="font-size:12.5px;color:var(--p2)">${esc(integ.join(" · "))}</span>`);
+  if(g.otherTests&&g.otherTests.length) rows.push(`<span>Outros testes</span><span style="font-size:12.5px">${g.otherTests.map(o=>`${esc(o.testName)} (tol. ${o.tol} mm): ${esc(GEO_LABEL[o.state]||o.state)}`).join("; ")}</span>`);
   if(g.volume) rows.push(`<span>Volume de interseção</span><span class="num">${g.volume.vmax-g.volume.vmin<=1e-12?m3(g.volume.vmin):`${m3(g.volume.vmin)} a ${m3(g.volume.vmax)}`}</span>`);
   if(g.extent) rows.push(`<span>Região de interseção</span><span class="num">${[0,1,2].map(k=>fmt((g.extent[k+3]-g.extent[k])*1000,0)).join(" × ")} mm <span class="muted" style="font-size:12px">(caixa, não é a penetração)</span></span>`);
   if(g.flags&&g.flags.length) rows.push(`<span>Observações</span><span style="font-size:12.5px">${g.flags.map(f=>esc(geoFlagText(f))).join("; ")}</span>`);
@@ -1386,7 +1483,7 @@ ${files.map(f=>`    <File>\n      <Filename>${x(f)}</Filename>\n    </File>`).jo
     <CreationDate>${(c.created||now).replace(/\.\d+Z$/,"Z")}</CreationDate>
     <CreationAuthor>${x(coordinator().email||coordinator().name)}</CreationAuthor>
     <AssignedTo>${x(memberEmail(c.resp))}</AssignedTo>
-    <Description>${x(c.suggested.reason)}${c.comments&&c.comments.length?" "+x(c.comments[c.comments.length-1].text):""}</Description>
+    <Description>${x(c.suggested.reason)}${c.geo&&(c.geo.state!=="confirmado"||c.geo.metricQuality!=="garantida")?x(` [Geometria: ${GEO_LABEL[c.geo.state]||c.geo.state}${c.geo.metricQuality==="estimada"?", espessura estimada":""}]`):""}${c.comments&&c.comments.length?" "+x(c.comments[c.comments.length-1].text):""}</Description>
   </Topic>
 ${comments?comments+"\n":""}  <Viewpoints Guid="${c.vpGuid||(c.vpGuid=uid())}">
     <Viewpoint>${c.vpGuid}.bcfv</Viewpoint>
