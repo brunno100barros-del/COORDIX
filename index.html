@@ -366,7 +366,9 @@ pre.xml{margin:0;padding:14px;background:var(--surface-2);border:var(--bw) solid
   .projsel{order:3;flex-basis:100%;border-right:0;border-top:var(--bw) solid var(--line);height:40px}
   .projsel select{max-width:60vw}
   .top .grow{display:none}
-  .top .tools{margin-left:auto;border-left:0}
+  .top .tools{order:2;flex-basis:100%;justify-content:space-between;border-left:0;border-top:var(--bw) solid var(--line);height:40px;padding-inline:var(--sp-4);min-width:0}
+  .pill{display:block;min-width:0;flex:0 1 auto;line-height:22px;overflow:hidden;text-overflow:ellipsis}
+  .pill .dot{display:inline-block;margin-right:6px;vertical-align:1px}
   nav.rail{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:var(--bw) solid var(--line);padding:0}
   nav.rail button{width:auto;white-space:nowrap;padding:0 12px}
   nav.rail button[aria-current="page"]::before{left:8px;right:8px;top:auto;bottom:0;width:auto;height:2px}
