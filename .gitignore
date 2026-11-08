@@ -2,3 +2,9 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# COORDIX Desktop (branch desktop-electron)
+node_modules/
+out/
+desktop/vendor/
+desktop-fumaca-*.json

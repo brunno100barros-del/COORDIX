@@ -1,0 +1,62 @@
+# COORDIX Desktop · testes e instalador Windows.
+# Roda só na branch desktop-electron (ou manualmente); não interfere no GitHub Pages da main.
+name: COORDIX Desktop (Windows)
+
+on:
+  push:
+    branches: [desktop-electron]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+
+      - name: Testes do núcleo geométrico (os mesmos da versão web)
+        run: |
+          node testes/geometria.test.js
+          node testes/comparativo_v1.js
+          node testes/bvh.test.js
+
+      - name: Teste dos caminhos de recursos do desktop
+        run: node desktop/scripts/testar-recursos.js
+
+      - name: Teste de fumaça (aplicativo em desenvolvimento)
+        run: npm run fumaca
+
+      - name: Gerar instalador Windows (.exe) e versão portátil (.zip)
+        run: npm run make
+
+      - name: Teste de fumaça (aplicativo empacotado)
+        run: node desktop/scripts/fumaca.js out/COORDIX-win32-x64/COORDIX.exe
+
+      - name: Instalar, conferir atalho do menu Iniciar e desinstalar
+        shell: pwsh
+        run: ./desktop/scripts/testar-instalador.ps1
+
+      - name: Publicar instalador e relatórios
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: COORDIX-Desktop-windows-beta
+          path: |
+            out/make/squirrel.windows/x64/*.exe
+            out/make/zip/win32/x64/*.zip
+            desktop-fumaca-*.json
+            desktop-instalador.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,37 @@
+{
+  "name": "coordix",
+  "productName": "COORDIX",
+  "version": "0.1.0",
+  "description": "BIMOFFICE: COORDIX, coordenação BIM e detecção de interferências em modelos IFC (versão desktop experimental)",
+  "author": "Eng. Brunno Resplandes",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "desktop/main.js",
+  "coordix": {
+    "canal": "beta",
+    "rotulo": "BETA · experimental",
+    "appId": "br.com.bimoffice.coordix"
+  },
+  "scripts": {
+    "preparar": "node desktop/scripts/preparar-vendor.js",
+    "start": "npm run preparar && electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "fumaca": "npm run preparar && node desktop/scripts/fumaca.js",
+    "test:nucleo": "node testes/geometria.test.js && node testes/comparativo_v1.js && node testes/bvh.test.js"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "1.0.1"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "7.11.2",
+    "@electron-forge/maker-squirrel": "7.11.2",
+    "@electron-forge/maker-zip": "7.11.2",
+    "@fontsource/ibm-plex-mono": "^5.0.0",
+    "@fontsource/ibm-plex-sans": "^5.0.0",
+    "@fontsource/ibm-plex-sans-condensed": "^5.0.0",
+    "electron": "44.9.3",
+    "three": "0.147.0",
+    "web-ifc": "0.0.39"
+  }
+}
