@@ -67,8 +67,11 @@ const PASSOS = {
     r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\\n')[0]).filter(Boolean);
     // identidade: disciplina MET nas regras e nenhum "Visus" nos textos da interface
     let textos = '';
-    for (const v of ['projeto','modelos','visualizador','regras','clashes','revisao','issues','bcf']) { $('[data-nav=' + v + ']')?.click(); await sl(400); textos += ' ' + ($('#main').innerText || ''); }
-    r.met = /Estrutura Metálica/.test(textos) && /MET/.test(textos);
+    for (const v of ['projeto','modelos','visualizador','regras','clashes','revisao','issues','bcf']) {
+      $('[data-nav=' + v + ']')?.click(); await sl(400); textos += ' ' + ($('#main').innerText || '');
+      if (v === 'regras') { const sels = [...document.querySelectorAll('#main select')]; r.metTestes = sels.filter(x => x.value === 'MET').length; r.metOpcao = sels.some(x => [...x.options].some(o => o.textContent === 'Estrutura Metálica')); }
+    }
+    r.met = r.metTestes >= 7 && r.metOpcao;
     r.visus = /visus/i.test(textos + ' ' + document.body.innerText);
     // projeto: Novo → IFCs → análise → Salvar → Excluir → Abrir (com os IFCs reencontrados pelas referências)
     const toastCom = (re) => esperar(() => [...document.querySelectorAll('.toast')].map(t => t.textContent).find(t => re.test(t)), 120000);
