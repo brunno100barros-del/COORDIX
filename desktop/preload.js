@@ -18,15 +18,17 @@ const api = {
 contextBridge.exposeInMainWorld("coordixDesktop", Object.freeze(api));
 
 let ocupado = false;
-/* espera o aviso que o app mostra ao terminar a leitura ("Modelos lidos…") */
+/* espera o aviso que o app mostra ao terminar a leitura ("Modelos lidos…"); cada arquivo é lido por inteiro antes do próximo */
 function esperarLeitura(ms) {
   return new Promise((ok) => {
     const fim = setTimeout(() => { obs.disconnect(); ok(false); }, ms);
-    const obs = new MutationObserver(() => {
-      const t = document.querySelector(".toast");
-      if (t && /Modelos lidos/.test(t.textContent)) { clearTimeout(fim); obs.disconnect(); ok(true); }
+    // cada aviso é um elemento novo no <body>: só conta o que aparecer depois de entregar o arquivo
+    const obs = new MutationObserver((muts) => {
+      for (const m of muts) for (const n of m.addedNodes) {
+        if (n.nodeType === 1 && n.classList.contains("toast") && /Modelos lidos/.test(n.textContent)) { clearTimeout(fim); obs.disconnect(); ok(true); return; }
+      }
     });
-    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+    obs.observe(document.body, { childList: true });
   });
 }
 async function selecionarIfc() {
