@@ -15,7 +15,7 @@ jobs:
         run: npm install --no-save --no-audit --no-fund playwright@1.49.1 && npx playwright install --with-deps chromium
       - name: Teste de fumaça web
         run: |
-          python3 -m http.server 8000 >/dev/null 2>&1 &
+          python3 -c "import http.server as h;H=h.SimpleHTTPRequestHandler;H.extensions_map.update({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8'});h.test(HandlerClass=H,port=8000,bind='127.0.0.1')" >/dev/null 2>&1 &  # utf-8 como no GitHub Pages
           sleep 2
           node teste-web/fumaca-web.js
       - uses: actions/upload-artifact@v4
