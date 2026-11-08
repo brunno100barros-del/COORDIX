@@ -67,6 +67,7 @@ if (a) {
   ok("projeto novo: origem local definida pelos IFCs georreferenciados (≈ 9.030 km) e sem alerta", a.diag && Array.isArray(a.diag.origem) && Math.max(...a.diag.origem.map(Math.abs)) > 9e6 && !a.alertaNovo, [a.diag, a.alertaNovo]);
   ok("desenho relativo ao centro: vértices pequenos (precisão Float32 preservada)", a.diag && a.diag.malhas > 0 && a.diag.maiorVertice < 200, a.diag);
   console.log("  análise do projeto novo (IFCs georreferenciados): " + a.analiseNovo);
+  ok("um leitor IFC por modelo (memória isolada) e PropertySets disponíveis depois da leitura", a.diag && a.diag.modelos === 2 && a.diag.leitores === 2 && a.diag.psets.every((n) => n > 0), a.diag);
   ok("novo projeto com 2 IFCs e análise em segundo plano", a.novoModelos && a.painelProgresso && !!a.analiseNovo, [a.novoModelos, a.painelProgresso, a.analiseNovo]);
   ok("Salvar projeto (.coordix)", !!a.salvo && /Projeto Fumaça\.coordix/.test(a.indicadorArquivo || ""), [a.salvo, a.indicadorArquivo]);
   ok("Excluir projeto: confirmação com o nome e aviso de que nenhum arquivo é apagado", /Projeto Fumaça/.test(a.confirmacaoExclusao || "") && /não são apagados/.test(a.confirmacaoExclusao || "") && !!a.excluido && !a.projetosAposExcluir.some((n) => /Fumaça/.test(n)), [a.confirmacaoExclusao, a.projetosAposExcluir]);

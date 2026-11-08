@@ -734,6 +734,20 @@ const TYPE_NAME={};
 const vec=v=>{if(!v) return []; if(Array.isArray(v)) return v; const out=[];const n=v.size();for(let i=0;i<n;i++) out.push(v.get(i));return out};
 const val=a=>a==null?null:(typeof a==="object"&&"value" in a)?a.value:a;
 
+/* Um leitor (instância WebAssembly) por modelo: cada instância tem o próprio espaço de memória de até 4 GB.
+   Com um leitor único, um IFC grande ocupava quase todo o espaço e os modelos seguintes falhavam por
+   "memória insuficiente". O leitor do modelo fica aberto para consultar as propriedades e é liberado ao remover. */
+async function newReader(){
+  try{const a=new WEBIFC.IfcAPI();a.SetWasmPath(WEBIFC_BASE,true);
+    await a.Init((path)=> path.endsWith(".wasm") ? WEBIFC_BASE+"web-ifc.wasm" : path, true);return a}
+  catch(e){console.warn("COORDIX: leitor dedicado indisponível; usando o leitor compartilhado",e);return api}
+}
+function releaseReader(m){
+  const A=m.api;if(!A) return;
+  try{if(m.mid!=null) A.CloseModel(m.mid)}catch(e){}
+  if(A!==api){try{A.Dispose()}catch(e){}}
+  m.api=null;
+}
 async function initEngine(){
   try{
     // leitor IFC: web-ifc 0.0.78 (lê IFC2X3, IFC4 e IFC4X3; geometria de curvas, varreduras e conexões
@@ -829,7 +843,8 @@ async function loadIfc(projectId, file, bytes, origem){
     try{const head=new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4000,bytes.byteLength)));const mm=head.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i);m.schema=mm?mm[1]:""}catch(e){}
     m.stage="abertura do arquivo";
     await loadStage(`Abrindo ${file} (leitura do IFC)`);
-    const mid=api.OpenModel(new Uint8Array(bytes),IFC_LOADER_SETTINGS);
+    m.api=await newReader();
+    const mid=m.api.OpenModel(new Uint8Array(bytes),IFC_LOADER_SETTINGS);
     bytes=null; // o leitor já copiou o arquivo: libera o original (arquivos grandes)
     if(mid<0) throw new Error("o leitor IFC não conseguiu abrir o arquivo");
     m.mid=mid;
@@ -845,13 +860,13 @@ async function loadIfc(projectId, file, bytes, origem){
     renderAll();
     if(projectId===DB.current && list.filter(x=>x.status==="pronto").length===1) fitView();
     linkModelRef(projectId,m);
-  }catch(e){console.error(e);m.status="erro";m.error=`${ifcErrorText(e)} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll();
+  }catch(e){console.error(e);releaseReader(m);m.status="erro";m.error=`${ifcErrorText(e)} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll();
     toast(`Não foi possível ler ${file}: ${m.error}`)}
   return m;
 }
 
 function indexModel(m){
-  const mid=m.mid,T=WEBIFC;
+  const mid=m.mid,T=WEBIFC,api=m.api;
   m.skipped=m.skipped||{};
   const skip=(what,e)=>{m.skipped[what]=(m.skipped[what]||0)+1;if(m.skipped[what]===1) console.warn("COORDIX: "+what+" ignorado",e)};
   const ids=code=>{if(code==null) return [];try{return vec(api.GetLineIDsWithType(mid,code))}catch(e){skip("tipo "+code,e);return []}};
@@ -917,7 +932,7 @@ function storeyOf(m,eid){
 }
 
 function buildGeometry(m){
-  const mid=m.mid,T=WEBIFC;
+  const mid=m.mid,T=WEBIFC,api=m.api;
   const ids=code=>code==null?[]:vec(api.GetLineIDsWithType(mid,code));
   const perEl=new Map(); // eid → {geoms:[{p,n,i,color}]}
   let origin=null;const cx=[],cy=[],cz=[]; // centros dos elementos (para a origem robusta)
@@ -959,6 +974,8 @@ function buildGeometry(m){
     for(const id of idsC){if(perEl.has(id)||m.unprocessed.some(u=>u.eid===id)) continue;
       try{const l=api.GetLine(mid,id,false);if(val(l.Representation)!=null) m.unprocessed.push({eid:id,reason:"o leitor não gerou malha para a representação"})}catch(e){}}
   }
+  // a malha já foi copiada para o COORDIX: descarta o cache de geometria do leitor (as propriedades continuam disponíveis)
+  try{if(typeof api.ResetCache==="function") api.ResetCache(mid)}catch(e){}
   for(const u of m.unprocessed){try{const l=api.GetLine(mid,u.eid,false);u.guid=val(l.GlobalId)||"";u.cls=TYPE_NAME[l.type]||"";u.name=decIfc(val(l.Name))||""}catch(e){u.guid="";u.cls=""}}
   m.stage="elementos";
   if(!origin){m.empty=true;return}
@@ -1088,7 +1105,10 @@ function boxOf(idxs){const b=new THREE.Box3();for(const i of idxs) b.union(ELEMS
 /* diagnóstico somente leitura (usado pelo teste de fumaça): origem do projeto e maior coordenada dos vértices desenhados */
 window.coordixDiagnostico=()=>{let vMax=0,pMax=0;for(const c of V.root.children){const a=c.geometry&&c.geometry.attributes.position;if(!a) continue;
   for(let k=0;k<a.array.length;k++){const v=Math.abs(a.array[k]);if(v>vMax)vMax=v}pMax=Math.max(pMax,Math.abs(c.position.x),Math.abs(c.position.y),Math.abs(c.position.z))}
-  return {projeto:DB.current,origem:projOffset(DB.current),maiorVertice:vMax,maiorPosicaoMalha:pMax,malhas:V.root.children.length}};
+  const ms=(S.models[DB.current]||[]).filter(m=>m.status==="pronto");
+  const leitores=new Set(ms.map(m=>m.api).filter(Boolean)).size;
+  const psets=ms.map(m=>{for(const i of m.elems){const n=psetsOf(ELEMS[i]).length;if(n) return n}return 0});
+  return {projeto:DB.current,origem:projOffset(DB.current),maiorVertice:vMax,maiorPosicaoMalha:pMax,malhas:V.root.children.length,modelos:ms.length,leitores,psets}};
 function fitView(box){
   if(!box){box=new THREE.Box3();for(const c of V.root.children) if(c.visible) box.expandByObject(c)} // caixa no mundo (malhas relativas ao centro)
   if(box.isEmpty()) return;
@@ -1133,7 +1153,7 @@ function psetsOf(el){
   if(el._psets) return el._psets;
   const m=el.m,out=[];
   const read=(id,fromType)=>{
-    let l;try{l=api.GetLine(m.mid,id,true)}catch(e){return}
+    let l;try{l=m.api.GetLine(m.mid,id,true)}catch(e){return}
     const tn=TYPE_NAME[l.type]||"";
     const name=decIfc(val(l.Name))||tn;
     const props=[];
@@ -1156,7 +1176,7 @@ function psetsOf(el){
   };
   for(const id of m.psetsOf[el.eid]||[]) read(id,false);
   const t=m.typeOf[el.eid];
-  if(t!=null){try{const tl=api.GetLine(m.mid,t,false);for(const r of tl.HasPropertySets||[]) read(val(r),true)}catch(e){}}
+  if(t!=null){try{const tl=m.api.GetLine(m.mid,t,false);for(const r of tl.HasPropertySets||[]) read(val(r),true)}catch(e){}}
   el._psets=out;return out;
 }
 function fmtVal(v){
@@ -1168,7 +1188,7 @@ function fmtVal(v){
 function layerOf(el){
   if(el._layer!==undefined) return el._layer;
   let name="";
-  try{const pds=api.GetLine(el.m.mid,el.rep,false);for(const r of pds.Representations||[]){const n=el.m.layerOfRep[val(r)];if(n){name=n;break}}}catch(e){}
+  try{const pds=el.m.api.GetLine(el.m.mid,el.rep,false);for(const r of pds.Representations||[]){const n=el.m.layerOfRep[val(r)];if(n){name=n;break}}}catch(e){}
   el._layer=name;return name;
 }
 function visusFields(el){
@@ -2087,7 +2107,7 @@ function removeModel(id){
   forgetAnalysisMeshes(m.elems);
   unlinkModelRef(P,m); // remover do projeto ≠ apagar o arquivo: o IFC no disco nunca é tocado
   for(const i of m.elems){ELEMS[i].geoms=[];ELEMS[i]._solid=null;ELEMS[i]._topo=null}
-  try{if(m.mid!=null) api.CloseModel(m.mid)}catch(e){}
+  releaseReader(m); // fecha o modelo e libera a memória do leitor dele
   S.models[P.id]=list.filter(x=>x!==m);
   if(!S.models[P.id].length&&P.origemLocal){delete P.origemLocal;save()} // sem modelos: o próximo IFC define a nova origem do projeto
   S.clashes[P.id]=(S.clashes[P.id]||[]).filter(c=>ELEMS[c.a].model!==id&&ELEMS[c.b].model!==id);
