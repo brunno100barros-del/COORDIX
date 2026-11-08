@@ -22,7 +22,8 @@ const arquivos = ["ARQ", "SAN"].map((d) => {
   // testa a origem local do projeto e o desenho relativo ao centro. O mesmo deslocamento nos dois arquivos.
   const txt = fs.readFileSync(path.join(RAIZ, "exemplos", `EXEMPLO-${d}.ifc`), "latin1");
   if (!txt.includes("#15=IFCLOCALPLACEMENT($,#4);")) throw new Error("posicionamento do terreno não encontrado em EXEMPLO-" + d);
-  fs.writeFileSync(destino, txt.replace("#15=IFCLOCALPLACEMENT($,#4);", "#15=IFCLOCALPLACEMENT($,#999002);")
+  // o terreno (#15) vai para o ponto georreferenciado e os demais posicionamentos absolutos passam a ser relativos a ele
+  fs.writeFileSync(destino, txt.split("IFCLOCALPLACEMENT($,").join("IFCLOCALPLACEMENT(#15,").replace("#15=IFCLOCALPLACEMENT(#15,#4);", "#15=IFCLOCALPLACEMENT($,#999002);")
     .replace("DATA;", "DATA;\n#999001=IFCCARTESIANPOINT((512345678.,9030612345.,0.));\n#999002=IFCAXIS2PLACEMENT3D(#999001,$,$);"), "latin1");
   return destino;
 });

@@ -981,7 +981,12 @@ function buildGeometry(m){
   const centro=[median(cx)*s,median(cy)*s,median(cz)*s];
   const Pj=DB.projects.find(p=>p.id===m.projectId);
   let OFF=projOffset(m.projectId);
-  if(!OFF){OFF=centro.map(v=>Math.round(v));if(Pj){Pj.origemLocal=OFF;save()}}
+  if(!OFF){
+    // 1º vértice do modelo (mesma referência das versões anteriores: resultados idênticos), salvo se ele for um ponto
+    // isolado longe do modelo (ex.: um elemento perdido na origem interna); nesse caso, o centro robusto
+    const pv=[origin[0]*s,origin[1]*s,origin[2]*s];
+    OFF=(Math.hypot(pv[0]-centro[0],pv[1]-centro[1],pv[2]-centro[2])>GEOC.GEO.FAR_COORD?centro:pv).map(v=>Math.round(v));
+    if(Pj){Pj.origemLocal=OFF;save()}}
   m.offset=OFF;
   // modelo em outro sistema de coordenadas (ex.: um IFC em coordenadas compartilhadas/UTM e outro na origem interna)
   const dist=Math.hypot(centro[0]-OFF[0],centro[1]-OFF[1],centro[2]-OFF[2]);
