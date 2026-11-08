@@ -21,7 +21,7 @@ const ok = (nome, cond, det) => { res.push(!!cond); console.log(`${cond ? "✔" 
   page.on("pageerror", (e) => erros.push(String(e)));
   page.on("requestfailed", (r) => falhas.push(r.url()));
   await page.goto("http://localhost:8000/", { waitUntil: "load" });
-  const $ = (s) => page.locator(s);
+  const $ = (s) => page.locator(s).first();
   const sl = (ms) => page.waitForTimeout(ms);
   const geo = () => page.evaluate(() => [...document.querySelectorAll("#main .muted")].map((e) => e.textContent).find((t) => t.includes("Pares verificados")) || null);
   const toast = (re) => page.waitForFunction((src) => [...document.querySelectorAll(".toast")].some((t) => new RegExp(src).test(t.textContent)), re.source, { timeout: 180000 }).then(() => true, () => false);
