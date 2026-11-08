@@ -9,6 +9,11 @@ A automação faz a parte repetitiva e o coordenador BIM continua responsável p
 
 > **Status:** protótipo funcional, versão **2.3** (veja o [histórico de versões](#histórico-de-versões)). Roda inteiro no navegador. Os modelos IFC não ficam salvos entre sessões. O backend em Python está planejado (veja o roteiro abaixo).
 
+## Versões web e desktop
+
+- **`main` = versão WEB oficial.** É a versão em uso, publicada no navegador. Esta branch tem apenas a versão web.
+- **`desktop-electron` = versão para instalação no Windows (experimental).** Aplicativo Electron que executa o mesmo COORDIX a partir dos arquivos locais, sem internet. Ela traz o instalador `.exe`, o atalho no menu Iniciar e a desinstalação normal. Está em beta, não altera a versão web e fica numa branch separada. Para usar, veja o README e `docs/desktop-electron.md` dessa branch.
+
 ## O que já funciona
 
 | Módulo | Recursos |
