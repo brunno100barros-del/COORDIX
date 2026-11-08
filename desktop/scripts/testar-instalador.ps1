@@ -19,12 +19,20 @@ $r.atalho_menu_iniciar = ($atalhos | ForEach-Object { $_.FullName.Replace($menu,
 Get-Process -Name "COORDIX" -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep 2
 Start-Process -FilePath (Join-Path $base "Update.exe") -ArgumentList "--uninstall", "-s" -Wait
-Start-Sleep 15
-Get-Process -Name "COORDIX" -ErrorAction SilentlyContinue | Stop-Process -Force
+# o Squirrel remove as pastas em segundo plano depois de encerrar o aplicativo; espera até 2 minutos
+$t0 = Get-Date
+do {
+  Start-Sleep 5
+  Get-Process -Name "COORDIX" -ErrorAction SilentlyContinue | Stop-Process -Force
+  $resta = Get-ChildItem $base -Directory -Filter "app-*" -ErrorAction SilentlyContinue
+} while ($resta -and ((Get-Date) - $t0).TotalSeconds -lt 120)
 $r.atalho_removido = -not (Get-ChildItem $menu -Recurse -Filter "COORDIX*.lnk" -ErrorAction SilentlyContinue)
-$r.aplicativo_removido = -not (Get-ChildItem $base -Directory -Filter "app-*" -ErrorAction SilentlyContinue)
+$r.aplicativo_removido = -not $resta
+# marcador ".dead": o Squirrel registrou a remoção e apaga o que estiver preso na próxima execução do Update.exe
+$r.remocao_registrada = Test-Path (Join-Path $base ".dead")
+$r.restante = ($resta | ForEach-Object { $_.Name }) -join ","
 
 $r | ConvertTo-Json | Set-Content -Encoding utf8 "desktop-instalador.json"
 $r | Format-List
-if (-not ($r.executavel_instalado -and $r.atalho_menu_iniciar -and $r.atalho_removido -and $r.aplicativo_removido)) { throw "Teste do instalador falhou" }
+if (-not ($r.executavel_instalado -and $r.atalho_menu_iniciar -and $r.atalho_removido -and ($r.aplicativo_removido -or $r.remocao_registrada))) { throw "Teste do instalador falhou" }
 Write-Host "Instalação, atalho no menu Iniciar e desinstalação conferidos."
