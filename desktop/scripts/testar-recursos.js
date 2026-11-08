@@ -8,6 +8,7 @@ const casos = [
   ["coordix://app/index.html", "index.html"],
   ["coordix://app/coordix-geometria.js", "coordix-geometria.js"],
   ["coordix://app/web-ifc.wasm", "web-ifc.wasm"],
+  ["coordix://app/coordix-analise-worker.js", "coordix-analise-worker.js"],
   ["coordix://app/exemplos/EXEMPLO-EST.ifc", "exemplos/EXEMPLO-EST.ifc"],
   ["coordix://app/marca/coordix-icone.svg", "marca/coordix-icone.svg"],
   ["https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js", "desktop/vendor/three/build/three.min.js"],

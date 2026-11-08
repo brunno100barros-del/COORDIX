@@ -349,6 +349,20 @@ pre.xml{margin:0;padding:14px;background:var(--surface-2);border:var(--bw) solid
 .toast::before{content:"";flex:none;width:6px;height:6px;background:var(--accent);transform:rotate(45deg)}
 @keyframes toast-in{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
 
+/* progresso de leitura e análise (não bloqueia a interface) */
+#progressPanel{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:45;width:min(380px,calc(100% - 32px));display:flex;flex-direction:column;gap:7px;
+  padding:12px 14px;background:var(--surface);border:var(--bw) solid var(--line-strong);border-radius:var(--r-2);box-shadow:var(--shadow-float);font-size:var(--fs-sm)}
+#progressPanel .pg-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+#progressPanel .pg-head b{font:600 var(--fs-2xs)/1.2 var(--font-mono);letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-2)}
+#progressPanel .pg-pct{font:600 var(--fs-md)/1 var(--font-mono);color:var(--accent)}
+#progressPanel .pg-bar{position:relative;height:4px;background:var(--surface-3);overflow:hidden}
+#progressPanel .pg-bar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);transition:width .15s linear}
+#progressPanel .pg-bar.indet i{width:28%;animation:pg-indet 1.2s var(--ease) infinite}
+@keyframes pg-indet{from{left:-28%}to{left:100%}}
+#progressPanel .pg-stage{color:var(--ink);font-weight:500}
+#progressPanel .pg-detail{font:500 var(--fs-xs)/1.3 var(--font-mono)}
+#progressPanel .btn{align-self:flex-end}
+
 /* barras de rolagem discretas */
 *{scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
 
@@ -727,17 +741,22 @@ async function loadIfc(projectId, file, bytes){
   try{
     try{const head=new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4000,bytes.byteLength)));const mm=head.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i);m.schema=mm?mm[1]:""}catch(e){}
     m.stage="abertura do arquivo";
+    await loadStage(`Abrindo ${file} (leitura do IFC)`);
     const mid=api.OpenModel(new Uint8Array(bytes),{COORDINATE_TO_ORIGIN:false,USE_FAST_BOOLS:true});
     m.mid=mid;
+    await loadStage("Lendo pavimentos, PropertySets, tipos e sistemas");
     indexModel(m);
     m.progress=.25;renderModelsProgress();
-    await new Promise(r=>setTimeout(r,0));
+    await loadStage("Gerando a geometria 3D dos elementos");
     buildGeometry(m);
     m.status="pronto";m.progress=1;
+    progress.detail(`${m.elems.length.toLocaleString("pt-BR")} elementos com geometria em ${file}`);
+    await loadStage("Montando a visualização");
     if(projectId===DB.current){attachModel(m);setViewerMsg("")}
     renderAll();
     if(projectId===DB.current && list.filter(x=>x.status==="pronto").length===1) fitView();
-  }catch(e){console.error(e);m.status="erro";m.error=`${e.message||e} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll()}
+  }catch(e){console.error(e);m.status="erro";m.error=`${e.message||e} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll();
+    toast(`Não foi possível ler ${file}: ${/memory|allocation/i.test(String(e.message||e))?"memória insuficiente para este arquivo":m.error}`)}
   return m;
 }
 
@@ -1048,7 +1067,7 @@ function extraFields(el){
   return [["Nome",el.name],["Classe IFC",ifcPretty(el.cls)],["PredefinedType",el.predef],["Sistema",el.system],["Tag",el.tag],
     ["Dimensões (mm)",el.size.map(v=>fmt(v)).join(" × ")],
     ["Integridade geométrica",el.geoIntegrity==="parcial"?`parcial — ${(el.geoFailures||[]).length} representação(ões) não lida(s)`:el.geoIntegrity==="completa"?"completa":""],
-    ["Topologia da malha",el._solid?({solido_valido:"sólido válido",aberta:"malha aberta",invalida:"malha inválida",superficie:"superfície sem volume"}[el._solid.topology]||el._solid.topology):""]];
+    ["Topologia da malha",(el._solid||el._topo)?({solido_valido:"sólido válido",aberta:"malha aberta",invalida:"malha inválida",superficie:"superfície sem volume"}[el._solid?el._solid.topology:el._topo]||(el._solid?el._solid.topology:el._topo)):""]];
 }
 
 /* ===================================================================== */
@@ -1085,6 +1104,7 @@ function pairKey(a,b){return [a.guid,b.guid].sort().join("|")}
 const GEOC=window.CoordixGeo;
 const GEO_LABEL={confirmado:"Confirmado",abaixo_tolerancia:"Abaixo da tolerância",contato:"Contato",sem_conflito:"Sem conflito",inconclusivo:"Inconclusivo",incompleto:"Análise incompleta"};
 const GEO_FLAG={
+  falha_avaliacao:"falha interna ao avaliar o par (resultado tratado como inconclusivo)",
   malha_aberta:"malha aberta (superfície não fecha um volume)",orientacao_inconsistente:"orientação das faces inconsistente",superficie_sem_volume:"elemento só de superfície, sem volume",
   triangulos_degenerados:"triângulos degenerados ignorados",sem_geometria_valida:"sem geometria válida",contencao_ambigua:"classificação dentro/fora ambígua em parte da região",
   contencao_ou_coincidencia:"um elemento está contido no outro ou há faces coincidentes",espessura_com_lacuna:"espessura com intervalo de incerteza (limite de avaliações)",
@@ -1122,16 +1142,17 @@ function geoChip(c){
   if(g.metricQuality==="estimada") return ` <span class="chip outline" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">estimado</span>`;
   return g.quality==="aproximada"?` <span class="chip outline" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">aprox.</span>`:"";
 }
-function runAnalysis(){
+async function runAnalysis(){
   const P=proj();const models=(S.models[P.id]||[]).filter(m=>m.status==="pronto");
   if(!models.length){toast("Carregue ao menos um modelo IFC.");return}
+  if(AN.running){toast("Já existe uma análise em andamento.");return}
   const t0=performance.now();
   const all=models.flatMap(m=>m.elems.map(i=>ELEMS[i]));
   const excluded=[];const pool=[];
   for(const el of all){const why=excludedBy(el,P);if(why) excluded.push({el,why});else pool.push(el)}
   const found=new Map();
   const tests=P.tests.filter(t=>t.on).sort((a,b)=>a.ordem-b.ordem);
-  let below=0,rejected=0,nNarrow=0;const checked=new Set(),geoStats={};
+  let below=0,rejected=0,nNarrow=0;const checked=new Set(),geoStats={},jobs=[];
   for(const t of tests){
     const A=pool.filter(e=>inGroup(e,t.a)),B=pool.filter(e=>inGroup(e,t.b));
     if(!A.length||!B.length) continue;
@@ -1151,7 +1172,21 @@ function runAnalysis(){
         const key=a.idx<b.idx?a.idx+"|"+b.idx:b.idx+"|"+a.idx; // por índice: GUIDs repetidos não somem da análise
         if(checked.has(key+"|"+t.id)) continue;
         checked.add(key+"|"+t.id);nNarrow++;
-        const r=GEOC.evaluatePair(solidOf(a),solidOf(b),{kind:t.kind,tol,volume:false}); // volume: calculado ao abrir o clash
+        jobs.push({a,b,t,tol,key});
+      }
+    }
+  }
+  // avaliação geométrica dos pares em segundo plano (Web Worker), com progresso real e cancelamento;
+  // mesmos pares, mesma ordem, mesmo núcleo e mesmas opções — volume: calculado ao abrir o clash
+  let results;
+  try{results=await evaluatePairs(jobs,{elements:all.length,pool:pool.length})}
+  catch(e){
+    if(e&&e.cancelado){toast("Análise cancelada. Os resultados anteriores foram mantidos.");return}
+    console.error(e);toast(`A análise foi interrompida: ${(e&&e.message)||e}. Os resultados anteriores foram mantidos.`);return;
+  }
+  for(let ji=0;ji<jobs.length;ji++){
+    const {a,b,t,key}=jobs[ji];let r=results[ji];
+        if(r&&r.erro!==undefined) r=failedPair(r.erro); // falha interna no par: nunca vira "sem conflito"
         // unidade não confirmada: a escala é desconhecida, então nenhuma comparação com a tolerância vale
         if((a.m.unitUnsupported||b.m.unitUnsupported)&&r.state!=="incompleto"){r.state="inconclusivo";r.metricQuality="indisponivel";r.flags.push("unidade_nao_suportada")}
         geoStats[r.state]=(geoStats[r.state]||0)+1;
@@ -1167,8 +1202,6 @@ function runAnalysis(){
         if(prev){const rank=x=>x.geo.state==="confirmado"?2:1;const keep=rank(item)>rank(prev)?item:prev,other=keep===item?prev:item;
           keep.geo.otherTests=[...(keep.geo.otherTests||[]),...(other.geo.otherTests||[]),{testName:other.testName,state:other.geo.state,tol:other.tol}];found.set(key,keep);continue}
         found.set(key,item);
-      }
-    }
   }
   const list=[...found.values()];
   for(const c of list){prepareClash(c,P)}
@@ -1186,9 +1219,90 @@ function runAnalysis(){
   const doubt=(geoStats.inconclusivo||0)+(geoStats.incompleto||0);
   toast(`${list.length} clashes encontrados · ${pend} aguardando sua revisão${doubt?` · ${doubt} com resultado geométrico a verificar`:""}.`);
 }
+/* ---------- análise em segundo plano: Web Worker, progresso e cancelamento ---------- */
+const AN={worker:null,sent:new Set(),running:null,exec:0};
+function failedPair(msg){
+  return {state:"inconclusivo",value:null,lb:null,ub:null,volume:null,extent:null,quality:"indisponivel",metricQuality:"indisponivel",
+    flags:["falha_avaliacao"],method:"erro",evidence:"falha ao avaliar: "+msg,bounds:null,center:null};
+}
+function analysisWorker(){
+  if(AN.worker) return AN.worker;
+  try{AN.worker=new Worker("coordix-analise-worker.js");AN.sent=new Set()}catch(e){console.warn("COORDIX: Web Worker indisponível; análise na linha principal",e);AN.worker=null}
+  return AN.worker;
+}
+function resetAnalysisWorker(){if(AN.worker){AN.worker.terminate();AN.worker=null}AN.sent=new Set()}
+function forgetAnalysisMeshes(idxs){if(AN.worker){AN.worker.postMessage({tipo:"descartar",idx:idxs});for(const i of idxs) AN.sent.delete(i)}}
+const STAGE_LABEL={pares:"Selecionando pares candidatos",malhas:"Preparando malhas (topologia e índice espacial)",avaliar:"Avaliando a geometria dos pares",consolidar:"Consolidando e pré-classificando"};
+function evaluatePairs(jobs,info){
+  const total=jobs.length;
+  return new Promise((resolve,reject)=>{
+    const exec=++AN.exec;let done=false;
+    const finish=(fn,v)=>{if(done) return;done=true;AN.running=null;fn(v)};
+    const cancel=()=>{resetAnalysisWorker();progress.hide();finish(reject,{cancelado:true})};
+    AN.running={exec,cancel};
+    progress.show({title:"Análise de interferências",stage:STAGE_LABEL.pares,detail:`${info.pool} de ${info.elements} elementos entram na análise · ${total} pares candidatos`,onCancel:cancel});
+    if(!total){progress.hide();finish(resolve,[]);return}
+    const w=analysisWorker();
+    if(!w){ // sem Worker: mesma avaliação na linha principal, em lotes, com progresso e cancelamento
+      const out=new Array(total);let k=0;
+      const step=()=>{
+        if(done) return;
+        const t1=performance.now();
+        while(k<total&&performance.now()-t1<40){const j=jobs[k];
+          try{out[k]=GEOC.evaluatePair(solidOf(j.a),solidOf(j.b),{kind:j.t.kind,tol:j.tol,volume:false})}catch(e){out[k]={erro:String(e.message||e)}}k++}
+        progress.update({stage:STAGE_LABEL.avaliar,done:k,total,unit:"pares"});
+        if(k<total) setTimeout(step,0); else {progress.hide();finish(resolve,out)}
+      };
+      setTimeout(step,30);return;
+    }
+    // envia ao worker só as malhas que ele ainda não tem (Float64, a mesma geometria da análise)
+    const need=[],seen=new Set();
+    for(const j of jobs) for(const el of [j.a,j.b]) if(!AN.sent.has(el.idx)&&!seen.has(el.idx)){seen.add(el.idx);need.push(el)}
+    for(let i=0;i<need.length;i+=200){
+      const itens=need.slice(i,i+200).map(el=>({idx:el.idx,incomplete:el.geoIntegrity!=="completa",geoms:el.geoms.map(g=>({p64:g.p64,i:g.i}))}));
+      w.postMessage({tipo:"malhas",itens});for(const el of need.slice(i,i+200)) AN.sent.add(el.idx);
+    }
+    w.onmessage=ev=>{
+      const m=ev.data;if(m.execucao!==exec||done) return;
+      if(m.tipo==="progresso") progress.update({stage:STAGE_LABEL[m.etapa==="malhas"?"malhas":"avaliar"],done:m.feitos,total:m.total,unit:m.etapa==="malhas"?"elementos":"pares"});
+      else if(m.tipo==="resultado"){
+        for(const [idx,tp] of Object.entries(m.topologias||{})){const el=ELEMS[+idx];if(el&&tp) el._topo=tp}
+        progress.update({stage:STAGE_LABEL.consolidar,done:null,total:null});
+        setTimeout(()=>{progress.hide();finish(resolve,m.resultados)},0);
+      }
+      else if(m.tipo==="falha"){progress.hide();finish(reject,new Error(m.mensagem))}
+    };
+    w.onerror=ev=>{ev.preventDefault();const msg=ev.message||"erro no processamento em segundo plano";resetAnalysisWorker();progress.hide();
+      finish(reject,new Error(/memory|memória|allocation/i.test(msg)?"memória insuficiente para os modelos carregados":msg))};
+    w.postMessage({tipo:"avaliar",execucao:exec,pares:jobs.map(j=>({a:j.a.idx,b:j.b.idx,kind:j.t.kind,tol:j.tol}))});
+  });
+}
+/* painel de progresso (não bloqueia a interface); percentual só quando há contagem real */
+const progress={
+  el:null,
+  show({title,stage,detail,onCancel}){
+    if(!this.el){this.el=document.createElement("div");this.el.id="progressPanel";this.el.setAttribute("role","status");this.el.setAttribute("aria-live","polite");document.body.appendChild(this.el)}
+    this.el.innerHTML=`<div class="pg-head"><b>${esc(title)}</b><span class="pg-pct num"></span></div>
+      <div class="pg-bar indet"><i></i></div><div class="pg-stage"></div><div class="pg-detail muted"></div>
+      ${onCancel?'<button class="btn small" type="button" data-pg-cancel>Cancelar</button>':""}`;
+    this.el.hidden=false;this.onCancel=onCancel||null;
+    const b=this.el.querySelector("[data-pg-cancel]");if(b) b.onclick=()=>{b.disabled=true;b.textContent="Cancelando…";this.onCancel&&this.onCancel()};
+    this.update({stage,done:null,total:null});this.el.querySelector(".pg-detail").textContent=detail||"";
+  },
+  update({stage,done,total,unit}){
+    if(!this.el||this.el.hidden) return;
+    if(stage) this.el.querySelector(".pg-stage").textContent=stage;
+    const bar=this.el.querySelector(".pg-bar"),pct=this.el.querySelector(".pg-pct");
+    if(total>0&&done!=null){const f=Math.min(1,done/total);bar.classList.remove("indet");bar.firstElementChild.style.width=(f*100).toFixed(1)+"%";
+      pct.textContent=`${Math.floor(f*100)}%`;this.el.querySelector(".pg-detail").textContent=`${done.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")} ${unit||""}`.trim()}
+    else{bar.classList.add("indet");bar.firstElementChild.style.width="";pct.textContent=""}
+  },
+  detail(t){if(this.el) this.el.querySelector(".pg-detail").textContent=t||""},
+  hide(){if(this.el) this.el.hidden=true},
+};
 function topologyStats(pool){
   const st={solido_valido:0,aberta:0,invalida:0,superficie:0,vazia:0,nao_avaliado:0};
-  for(const e of pool){if(!e._solid){st.nao_avaliado++;continue}st[e._solid.topology]=(st[e._solid.topology]||0)+1}
+  for(const e of pool){const tp=e._solid?e._solid.topology:e._topo;if(!tp){st.nao_avaliado++;continue}st[tp]=(st[tp]||0)+1}
   return st;
 }
 function levelOrder(){
@@ -1759,7 +1873,7 @@ document.addEventListener("click",e=>{
   const t=e.target;
   const nav=t.closest("[data-nav]");if(nav){go(nav.dataset.nav);return}
   if(t.closest("#reviewPill")){go("revisao");return}
-  if(t.closest("[data-run]")){toast("Analisando a geometria dos modelos…");setTimeout(()=>{runAnalysis();if(DB.view==="revisao"){renderQueue();renderReviewCard(true)}},60);return}
+  if(t.closest("[data-run]")){runAnalysis().then(()=>{if(DB.view==="revisao"){renderQueue();renderReviewCard(true)}});return}
   if(t.closest("#newProjectBtn")){const p={id:uid(),name:"Novo projeto",desc:"",team:[{id:uid(),name:"",role:"Coordenador BIM",codes:"",email:"",coord:true}],...defaultSettings()};DB.projects.push(p);switchProject(p.id);go("projeto");setTimeout(()=>$("#pName")?.select(),30);return}
   if(t.closest("#delProject")){const P=proj();if(t.dataset.confirm!=="1"){t.dataset.confirm="1";t.textContent="Confirmar exclusão";return}DB.projects=DB.projects.filter(p=>p!==P);switchProject(DB.projects[0].id);return}
   if(t.closest("#addMember")){proj().team.push({id:uid(),name:"",role:"",codes:"",email:""});save();renderAll();return}
@@ -1825,18 +1939,27 @@ document.addEventListener("keydown",e=>{if(e.target.id==="drop"&&(e.key==="Enter
 
 function reassignResp(){for(const c of currentClashes()){if(c.state!=="validado"){const r=responsible(c,proj());c.respSuggested=r.member;if(c.cls!=="FALSO") c.resp=r.member}}}
 async function handleFiles(files){
-  const P=proj();
-  for(const f of files){
-    if(!/\.ifc$/i.test(f.name)){toast(`${f.name} não é um arquivo .ifc.`);continue}
+  const P=proj();files=[...files]; // cópia: o <input> é limpo logo após o evento e não pode esvaziar esta lista
+  const ifcs=files.filter(f=>/\.ifc$/i.test(f.name));
+  for(const f of files) if(!ifcs.includes(f)) toast(`${f.name} não é um arquivo .ifc.`);
+  for(let k=0;k<ifcs.length;k++){
+    const f=ifcs[k];
+    progress.show({title:"Leitura de modelos IFC",stage:"Carregando o arquivo",detail:`Arquivo ${k+1} de ${ifcs.length} · ${f.name} · ${fmtSize(f.size)}`});
     const buf=await f.arrayBuffer();
     await loadIfc(P.id,f.name,buf);
   }
-  toast("Modelos lidos. Execute a análise em Clashes por nível.");
+  progress.hide();
+  if(ifcs.length) toast("Modelos lidos. Execute a análise em Clashes por nível.");
 }
+/* etapa da leitura do IFC: atualiza o painel e devolve o controle ao navegador para desenhá-lo
+   (cada etapa do leitor é uma operação única do web-ifc, sem contagem parcial: indicador indeterminado) */
+async function loadStage(t){progress.update({stage:t,done:null,total:null});await new Promise(r=>setTimeout(r,20))}
+function fmtSize(b){return b>=1048576?`${(b/1048576).toLocaleString("pt-BR",{maximumFractionDigits:1})} MB`:`${Math.max(1,Math.round(b/1024))} kB`}
 function removeModel(id){
   const P=proj();const list=S.models[P.id]||[];const m=list.find(x=>x.id===id);if(!m) return;
   for(const c of m.chunks){V.root.remove(c);c.geometry.dispose();c.material.dispose()}
-  for(const i of m.elems){ELEMS[i].geoms=[];ELEMS[i]._solid=null}
+  forgetAnalysisMeshes(m.elems);
+  for(const i of m.elems){ELEMS[i].geoms=[];ELEMS[i]._solid=null;ELEMS[i]._topo=null}
   try{if(m.mid!=null) api.CloseModel(m.mid)}catch(e){}
   S.models[P.id]=list.filter(x=>x!==m);
   S.clashes[P.id]=(S.clashes[P.id]||[]).filter(c=>ELEMS[c.a].model!==id&&ELEMS[c.b].model!==id);
@@ -1854,10 +1977,12 @@ function switchProject(id){
 const SAMPLES=["EXEMPLO-EST.ifc","EXEMPLO-ARQ.ifc","EXEMPLO-SAN.ifc","EXEMPLO-ELE.ifc","EXEMPLO-SCE.ifc","EXEMPLO-CLI.ifc"];
 async function loadSamples(){
   setStatus("Lendo modelos de exemplo…");
-  for(const f of SAMPLES){
+  for(let k=0;k<SAMPLES.length;k++){const f=SAMPLES[k];
+    progress.show({title:"Leitura de modelos IFC",stage:"Carregando o arquivo",detail:`Exemplo ${k+1} de ${SAMPLES.length} · ${f}`});
     try{const r=await fetch("./exemplos/"+f);if(!r.ok) throw new Error(r.status);const b=await r.arrayBuffer();await loadIfc("exemplo",f,b)}
     catch(e){console.error(e);toast(`Não foi possível ler ${f}.`)}
   }
+  progress.hide();
   setStatus("Clique em um elemento para ver as propriedades.");
   if(DB.current==="exemplo"){fitView();runAnalysis()} else S.pendingExampleRun=true;
 }

@@ -19,7 +19,7 @@ const MIME = {
 
 /* arquivos da aplicação que podem ser servidos (relativos à raiz do aplicativo) */
 const PERMITIDOS = [
-  /^index\.html$/, /^coordix-geometria\.js$/, /^web-ifc\.wasm$/,
+  /^index\.html$/, /^coordix-geometria\.js$/, /^coordix-analise-worker\.js$/, /^web-ifc\.wasm$/,
   /^exemplos\/[A-Za-z0-9._-]+\.ifc$/, /^marca\/[A-Za-z0-9._-]+\.svg$/,
   /^desktop\/vendor\/[A-Za-z0-9._\/-]+\.(js|mjs|wasm|css|woff2)$/,
 ];
