@@ -46,7 +46,9 @@ if (a) {
   ok("fontes IBM Plex locais", a.fontes.every(Boolean), a.fontes);
   ok("versão e desenvolvedor em 'Sobre o COORDIX' (fora da faixa vertical)", a.semSelo && /Brunno Resplandes/.test(a.sobre || "") && /Desktop/.test(a.sobre || "") && /beta/i.test(a.sobre || ""), a.sobre);
   ok("8 telas abrem com conteúdo", Object.values(a.telas).every((n) => n > 50), a.telas);
-  ok("resultado geométrico igual ao da versão web", /21 confirmado · 1 abaixo da tolerância · 4 contato/.test(a.geometria || ""), a.geometria);
+  // leitor web-ifc 0.0.78 (desktop 0.3.0): mesmos 21 confirmados e 1 abaixo da tolerância; 10 contatos (eram 4 com o
+  // leitor 0.0.39, que gerava 4 elementos como sólidos inválidos); mesma classificação (8 a corrigir, 13 falsos)
+  ok("resultado geométrico de referência (leitor 0.0.78)", /21 confirmado · 1 abaixo da tolerância · 10 contato · Elementos analisados: 33 sólidos válidos/.test(a.geometria || ""), a.geometria);
   ok("clashes a corrigir e falsos clashes", a.abas[0] === "A corrigir (8)" && a.abas[1] === "Falsos clashes (13)", a.abas);
   ok("revisão com câmera e legenda A/B", a.revisaoCamera);
   ok("validação vira issue (21 → 20 pendentes, 1 issue)", a.pendentes1 === "20" && a.issues === 1, [a.pendentes1, a.issues]);
