@@ -16,7 +16,7 @@ A automação faz a parte repetitiva e o coordenador BIM continua responsável p
 | Projeto e equipe | Projetos separados, integrantes com cargo, códigos de disciplina e e-mail, indicação do coordenador |
 | Modelos IFC | Upload por arrastar e soltar, disciplina detectada pelo código no nome do arquivo (EST, ARQ, SAN, ELE, SCE, PCI, CLI…), esquema IFC e entidades ignoradas na leitura |
 | Visualizador | 3D com árvore modelo → pavimento → entidade, isolar, aproximar e snapshot |
-| Propriedades | Aba **Geral** no padrão Visus (Disciplina, **Entidade**, ID IFC, Layer, Pavimento, Type) e aba **PropertySets** com quantitativos e propriedades do tipo |
+| Propriedades | Aba **Geral** no padrão COORDIX (Disciplina, **Entidade**, ID IFC, Layer, Pavimento, Type) e aba **PropertySets** com quantitativos e propriedades do tipo |
 | Regras de análise | Matriz de tolerância com os 21 testes do manual corporativo (interferência ou folga, em mm), filtros de exclusão por entidade ou PropertySet, ordem de flexibilidade das disciplinas e tabela de nomes de Entidade editável |
 | Clash detection | Núcleo geométrico próprio (`coordix-geometria.js`): classificação topológica das malhas (sólido válido, aberta, inválida), espessura de interferência rigorosa (exata para peças convexas) ou estimada quando a malha não é sólida, volume de interseção, folga por distância exata, integridade geométrica por elemento, índice espacial (BVH) em cada malha, unidade declarada no IFC e estados de confiabilidade (confirmado, abaixo da tolerância, contato, sem conflito, inconclusivo e incompleto) |
 | Clashes por nível | Resultados agrupados por pavimento, aba separada de **falsos clashes** e alerta de revisão pendente |
@@ -34,7 +34,7 @@ Os números de versão abaixo organizam as entregas; cada uma corresponde a comm
 Primeiro protótipo, publicado como BIMORA.
 - Projetos separados, com equipe, cargos, disciplinas e coordenador.
 - Upload de IFC com disciplina detectada pelo nome do arquivo, visualizador 3D e árvore modelo → pavimento → entidade.
-- Propriedades no padrão Visus (aba Geral com **Entidade**) e PropertySets, com filtros de exclusão por entidade ou PropertySet.
+- Propriedades com a aba Geral (**Entidade** em português) e PropertySets, com filtros de exclusão por entidade ou PropertySet.
 - Matriz com os 21 testes do manual corporativo e tolerâncias em mm.
 - Detecção de clashes, agrupamento por pavimento, pré-classificação P1–P4 / INFO / Falso clash com responsável sugerido, aba de falsos clashes e alerta de revisão.
 - Revisão um por um com câmera no conflito, issues e prévia do BCF 2.1.
@@ -137,7 +137,7 @@ Bibliotecas carregadas por CDN: three.js 0.147 e web-ifc 0.0.39.
 2. Fase 02: ~~BVH por elemento (Marco 1)~~ concluído; índice espacial entre elementos (Marco 2), análise em segundo plano com Web Worker (Marco 3), decomposição convexa (Marco 4) e junções em T (Marco 5).
 3. Atribuição de pavimento pela cota para modelos sem pavimentos reais (por exemplo, estrutura metálica em "Default Storey").
 4. Geração do arquivo BCF 2.1 e validação da importação no Trimble Connect.
-5. Revisão dos nomes de Entidade conforme o Visus.
+5. Revisão dos nomes de Entidade.
 
 ## Licenças de terceiros
 

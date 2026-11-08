@@ -10,6 +10,7 @@ const { app, BrowserWindow, protocol, dialog, ipcMain, session } = require("elec
 const path = require("path");
 const fs = require("fs");
 const { ESQUEMA, ORIGEM, resolver, tipoDe } = require("./recursos");
+const PROJETOS = require("./projetos");
 
 // instalador Squirrel: cria/remove atalhos do menu Iniciar e da área de trabalho e encerra
 if (require("electron-squirrel-startup")) app.quit();
@@ -90,8 +91,8 @@ async function abrirIfc(evt) {
     if (path.extname(p).toLowerCase() !== ".ifc") continue;
     const st = await fs.promises.stat(p);
     if (!st.isFile() || st.size > LIMITE_IFC) continue;
-    const buf = await fs.promises.readFile(p);
-    saida.push({ nome: path.basename(p), bytes: new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength), modificado: st.mtimeMs });
+    PROJETOS.autorizar(p); // o projeto pode guardar a referência e reabrir este arquivo depois
+    saida.push(await PROJETOS.lerIfc(p)); // {nome, caminho, bytes, modificado, tamanho, sha256}
   }
   return saida;
 }
@@ -102,6 +103,7 @@ app.whenReady().then(() => {
   protocol.handle("http", (req) => { ERROS_REDE.push({ url: req.url, status: 403 }); return new Response("", { status: 403 }); });
   session.defaultSession.setPermissionRequestHandler((wc, permissao, ok) => ok(permissao === "clipboard-sanitized-write"));
   ipcMain.handle("coordix:abrir-ifc", abrirIfc);
+  PROJETOS.registrar(ORIGEM, FUMACA);
   ipcMain.handle("coordix:info", () => ({ versao: PKG.version, rotulo: PKG.coordix.rotulo, autor: PKG.author, plataforma: process.platform }));
   app.setAppUserModelId("com.squirrel.coordix.coordix");
   const win = criarJanela();

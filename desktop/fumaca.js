@@ -18,6 +18,8 @@ function configurar(app) {
   // máquinas de integração contínua não têm GPU: WebGL por renderização em software (só no teste)
   if (env.COORDIX_FUMACA_SEM_GPU) app.commandLine.appendSwitch("enable-unsafe-swiftshader");
 }
+function projetoParaSalvar(nome) { return require("path").join(env.COORDIX_FUMACA_PASTA, nome); }
+function projetoParaAbrir() { return require("path").join(env.COORDIX_FUMACA_PASTA, "Projeto Fumaça.coordix"); }
 function arquivosDoDialogo() {
   try { return JSON.parse(env.COORDIX_FUMACA_ARQUIVOS || "[]"); } catch { return []; }
 }
@@ -35,7 +37,10 @@ const PASSOS = {
     for (const f of ['400 12px "IBM Plex Sans"', '400 12px "IBM Plex Mono"', '600 12px "IBM Plex Sans Condensed"']) {
       try { r.fontes.push((await document.fonts.load(f, 'Ação')).length > 0 && document.fonts.check(f, 'Ação')); } catch (e) { r.fontes.push(false); }
     }
-    r.selo = $('#coordix-desktop-selo')?.innerText || null;
+    // versão e desenvolvedor: em "Sobre o COORDIX" (não mais na faixa vertical)
+    r.semSelo = !$('#coordix-desktop-selo');
+    $('#aboutBtn')?.click(); await sl(600);
+    r.sobre = $('#aboutKv')?.innerText || null; $('[data-about-close]')?.click(); await sl(200);
     r.telas = {};
     for (const v of ['projeto','modelos','visualizador','regras','clashes','revisao','issues','bcf']) {
       $('[data-nav=' + v + ']')?.click(); await sl(700); r.telas[v] = ($('#main').innerText || '').length;
@@ -60,12 +65,50 @@ const PASSOS = {
     r.modelosCarregados = !!(await esperar(() => document.querySelectorAll('#main tbody tr').length >= antes + 2 && (document.body.innerText.match(/FUMACA-/g) || []).length >= 2, 120000));
     r.linhasModelos = [antes, document.querySelectorAll('#main tbody tr').length];
     r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\\n')[0]).filter(Boolean);
+    // identidade: disciplina MET nas regras e nenhum "Visus" nos textos da interface
+    let textos = '';
+    for (const v of ['projeto','modelos','visualizador','regras','clashes','revisao','issues','bcf']) { $('[data-nav=' + v + ']')?.click(); await sl(400); textos += ' ' + ($('#main').innerText || ''); }
+    r.met = /Estrutura Metálica/.test(textos) && /MET/.test(textos);
+    r.visus = /visus/i.test(textos + ' ' + document.body.innerText);
+    // projeto: Novo → IFCs → análise → Salvar → Excluir → Abrir (com os IFCs reencontrados pelas referências)
+    const toastCom = (re) => esperar(() => [...document.querySelectorAll('.toast')].map(t => t.textContent).find(t => re.test(t)), 120000);
+    const geo = () => [...document.querySelectorAll('#main .muted')].map(e => e.textContent).find(t => t.includes('Pares verificados')) || null;
+    $('#projMenuBtn')?.click(); await sl(200); $('#newProjectBtn')?.click(); await sl(800);
+    const nome = $('#pName'); if (nome) { nome.value = 'Projeto Fumaça'; nome.dispatchEvent(new Event('change', { bubbles: true })); } await sl(400);
+    $('[data-nav=modelos]')?.click(); await sl(500);
+    $('#drop')?.click();
+    r.novoModelos = !!(await esperar(() => document.querySelectorAll('#main tbody tr').length >= 2 && (document.querySelector('#main tbody')?.innerText.match(/FUMACA-/g) || []).length >= 2 && !/Lendo|lendo/.test(document.querySelector('#main tbody')?.innerText || ''), 120000));
+    $('[data-nav=clashes]')?.click(); await sl(400);
+    $('[data-run]')?.click();
+    r.painelProgresso = !!(await esperar(() => $('#progressPanel:not([hidden])') || [...document.querySelectorAll('.toast')].some(t => /clashes encontrados/.test(t.textContent)), 20000));
+    r.analiseNovo = (await toastCom(/clashes encontrados/)) ? geo() : null;
+    await sl(800);
+    $('#projMenuBtn')?.click(); await sl(200); $('[data-pact=salvar]')?.click();
+    r.salvo = await toastCom(/Projeto salvo/);
+    r.indicadorArquivo = $('#projFile')?.textContent || null;
+    await sl(500);
+    $('#projMenuBtn')?.click(); await sl(200); $('[data-pact=excluir]')?.click(); await sl(600);
+    r.confirmacaoExclusao = $('#confirmDlg[open]')?.innerText || null;
+    $('#confirmDlg .btn.danger')?.click();
+    r.excluido = await toastCom(/excluído/);
+    r.projetosAposExcluir = [...document.querySelectorAll('#projectSelect option')].map(o => o.textContent);
+    await sl(500);
+    $('#projMenuBtn')?.click(); await sl(200); $('[data-pact=abrir]')?.click();
+    r.aberto = await toastCom(/aberto/);
+    r.reanalise = (await toastCom(/clashes encontrados/)) ? true : false;
+    $('[data-nav=clashes]')?.click(); await sl(500);
+    r.analiseReaberto = geo();
+    $('[data-nav=modelos]')?.click(); await sl(500);
+    r.modelosReaberto = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\n')[0]).filter(Boolean);
     await sl(1500); // gravação do localStorage (atraso de 250 ms no app) e fim de leitura
     return r;
   })()`,
   "2": `(async () => {
     const sl = ms => new Promise(r => setTimeout(r, ms)), $ = s => document.querySelector(s), r = {};
     const esperar = async (f, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const v = f(); if (v) return v; await sl(250); } return null; };
+    // a fase 1 terminou no projeto reaberto; as conferências de persistência são feitas no projeto de exemplo
+    await sl(1500);
+    { const sel = $('#projectSelect'); if (sel && sel.value !== 'exemplo') { sel.value = 'exemplo'; sel.dispatchEvent(new Event('change', { bubbles: true })); } }
     r.motor = !!(await esperar(() => $('#reviewPill:not([hidden]) .num'), 120000));
     r.pendentes = $('#reviewPill .num')?.textContent || null;
     r.tema = document.documentElement.dataset.theme;
@@ -74,6 +117,19 @@ const PASSOS = {
     $('[data-nav=modelos]')?.click(); await sl(600);
     r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\\n')[0]).filter(Boolean);
     try { r.armazenamentoOk = !!JSON.parse(localStorage.getItem('bimora.v1')).projects.length; } catch (e) { r.armazenamentoOk = false; }
+    // recuperação: o projeto salvo continua no COORDIX e reabre os IFCs vinculados pelo botão "Carregar todos"
+    const sel = $('#projectSelect'), op = [...(sel?.options || [])].find(o => /Projeto Fumaça/.test(o.textContent));
+    r.projetoRecuperado = !!op;
+    if (op) {
+      sel.value = op.value; sel.dispatchEvent(new Event('change', { bubbles: true })); await sl(800);
+      $('[data-nav=modelos]')?.click(); await sl(600);
+      r.vinculados = /Modelos vinculados ao projeto/.test($('#main').innerText);
+      $('[data-link=todos]')?.click();
+      const ok = await esperar(() => [...document.querySelectorAll('.toast')].some(t => /clashes encontrados/.test(t.textContent)), 120000);
+      r.recarregados = !!ok;
+      $('[data-nav=clashes]')?.click(); await sl(500);
+      r.analiseRecuperada = [...document.querySelectorAll('#main .muted')].map(e => e.textContent).find(t => t.includes('Pares verificados')) || null;
+    }
     return r;
   })()`,
 };
@@ -104,4 +160,4 @@ function executar(win, errosRede) {
   });
 }
 
-module.exports = { configurar, arquivosDoDialogo, executar };
+module.exports = { configurar, arquivosDoDialogo, projetoParaSalvar, projetoParaAbrir, executar };

@@ -1,36 +1,43 @@
 /* COORDIX Desktop · preload (contexto isolado, sandbox).
  *
- * Expõe à página só duas funções, por canais IPC específicos:
- *   coordixDesktop.abrirIfc()  diálogo nativo do Windows (vários arquivos .ifc) → [{nome, bytes}]
- *   coordixDesktop.info()      versão e rótulo do aplicativo
+ * Expõe à página, por canais IPC específicos e validados no processo principal:
+ *   coordixDesktop.abrirIfc()                diálogo nativo (vários .ifc) → [{nome, caminho, bytes, sha256, …}]
+ *   coordixDesktop.info()                    versão, rótulo e desenvolvedor
+ *   coordixDesktop.origemDoArquivo(file)     caminho de um IFC escolhido/solto pelo usuário (para o projeto referenciar)
+ *   coordixDesktop.projeto.abrir()           diálogo → conteúdo do .coordix + situação de cada IFC referenciado
+ *   coordixDesktop.projeto.salvar({...})     grava o .coordix (Salvar / Salvar como)
+ *   coordixDesktop.ifc.ler(caminho)          lê um IFC já autorizado (referenciado por projeto aberto pelo usuário)
+ *   coordixDesktop.ifc.localizar(nome)       diálogo para localizar um IFC ausente
  * Nenhuma API do Node.js nem acesso livre ao disco chega à interface.
  *
- * Integração sem alterar o index.html: o clique (ou Enter/Espaço) na área de upload abre o diálogo
- * nativo; os arquivos escolhidos são entregues ao mesmo <input id="fileInput"> que a versão web usa,
- * então a leitura do IFC segue exatamente o mesmo caminho. Arrastar e soltar continua igual. */
+ * Integração sem alterar o caminho de leitura: o clique (ou Enter/Espaço) na área de upload abre o
+ * diálogo nativo; os arquivos escolhidos são entregues ao mesmo <input id="fileInput"> da versão web. */
 "use strict";
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
+
+// origem dos arquivos entregues à página: nome|tamanho|modificado → caminho no disco
+const origens = new Map();
+const chave = (nome, tamanho, modificado) => `${nome}|${tamanho}|${Math.round(modificado || 0)}`;
 
 const api = {
   abrirIfc: () => ipcRenderer.invoke("coordix:abrir-ifc"),
   info: () => ipcRenderer.invoke("coordix:info"),
+  origemDoArquivo: (f) => {
+    if (!f || typeof f.name !== "string") return null;
+    return origens.get(chave(f.name, f.size, f.lastModified)) || null;
+  },
+  projeto: Object.freeze({
+    abrir: () => ipcRenderer.invoke("coordix:projeto-abrir"),
+    salvar: (args) => ipcRenderer.invoke("coordix:projeto-salvar", args),
+  }),
+  ifc: Object.freeze({
+    ler: (caminho) => ipcRenderer.invoke("coordix:ifc-ler", { caminho }),
+    localizar: (nome) => ipcRenderer.invoke("coordix:ifc-localizar", { nome }),
+  }),
 };
 contextBridge.exposeInMainWorld("coordixDesktop", Object.freeze(api));
 
 let ocupado = false;
-/* espera o aviso que o app mostra ao terminar a leitura ("Modelos lidos…"); cada arquivo é lido por inteiro antes do próximo */
-function esperarLeitura(ms) {
-  return new Promise((ok) => {
-    const fim = setTimeout(() => { obs.disconnect(); ok(false); }, ms);
-    // cada aviso é um elemento novo no <body>: só conta o que aparecer depois de entregar o arquivo
-    const obs = new MutationObserver((muts) => {
-      for (const m of muts) for (const n of m.addedNodes) {
-        if (n.nodeType === 1 && n.classList.contains("toast") && /Modelos lidos/.test(n.textContent)) { clearTimeout(fim); obs.disconnect(); ok(true); return; }
-      }
-    });
-    obs.observe(document.body, { childList: true });
-  });
-}
 async function selecionarIfc() {
   if (ocupado) return;
   ocupado = true;
@@ -39,17 +46,13 @@ async function selecionarIfc() {
     if (!arquivos || !arquivos.length) return;
     const entrada = document.getElementById("fileInput");
     if (!entrada) return;
-    // um arquivo por vez: o app limpa o <input> logo após o evento "change" (t.value = ""), e o Chromium
-    // esvazia a mesma lista de arquivos que a leitura ainda está percorrendo; entregando um por vez,
-    // todos os arquivos escolhidos são lidos, pelo mesmo caminho da versão web
+    const dt = new DataTransfer();
     for (const a of arquivos) {
-      const dt = new DataTransfer();
-      dt.items.add(new File([a.bytes], a.nome, { type: "application/octet-stream", lastModified: a.modificado }));
-      const lido = esperarLeitura(10 * 60 * 1000);
-      entrada.files = dt.files;
-      entrada.dispatchEvent(new Event("change", { bubbles: true }));
-      await lido;
+      origens.set(chave(a.nome, a.bytes.byteLength, a.modificado), a.caminho);
+      dt.items.add(new File([a.bytes], a.nome, { type: "application/octet-stream", lastModified: Math.round(a.modificado) }));
     }
+    entrada.files = dt.files;
+    entrada.dispatchEvent(new Event("change", { bubbles: true }));
   } catch (e) {
     console.error("COORDIX Desktop: falha ao abrir os arquivos IFC", e);
   } finally { ocupado = false; }
@@ -67,24 +70,15 @@ window.addEventListener("keydown", (e) => {
   e.preventDefault(); e.stopImmediatePropagation();
   selecionarIfc();
 }, true);
+// arquivos soltos na janela: registra o caminho real (só o Electron o conhece) para o projeto poder referenciá-los
+window.addEventListener("drop", (e) => {
+  const fs = e.dataTransfer && e.dataTransfer.files;
+  if (!fs) return;
+  for (const f of fs) {
+    let p = "";
+    try { p = webUtils.getPathForFile(f); } catch {}
+    if (p && /\.ifc$/i.test(p)) { origens.set(chave(f.name, f.size, f.lastModified), p); ipcRenderer.invoke("coordix:autorizar-arquivo", { caminho: p }).catch(() => {}); }
+  }
+}, true);
 
-/* selo da versão experimental, no canto inferior esquerdo (só no aplicativo desktop) */
-window.addEventListener("DOMContentLoaded", async () => {
-  let info = { versao: "", rotulo: "BETA" };
-  try { info = await api.info(); } catch {}
-  const selo = document.createElement("div");
-  selo.id = "coordix-desktop-selo";
-  selo.setAttribute("aria-label", `Desenvolvido por ${info.autor || "Eng. Brunno Resplandes"}. Versão ${info.versao} ${info.rotulo}`);
-  selo.style.cssText = [
-    "position:fixed", "left:16px", "bottom:12px", "z-index:40", "pointer-events:none",
-    "display:flex", "flex-direction:column", "gap:4px",
-    "font:500 10px/1.25 var(--font-mono, ui-monospace, monospace)", "letter-spacing:.04em", "color:var(--faint, #8b929c)",
-  ].join(";");
-  const autor = document.createElement("span");
-  autor.textContent = "desenvolvido por " + (info.autor || "Eng. Brunno Resplandes");
-  const beta = document.createElement("span");
-  beta.textContent = `${info.rotulo} · v${info.versao}`;
-  beta.style.cssText = "align-self:flex-start;padding:2px 6px;border:1px solid var(--accent-line, #dfb391);color:var(--accent, #a84d1c);border-radius:2px;font-weight:600;letter-spacing:.1em";
-  selo.append(autor, beta);
-  document.body.appendChild(selo);
-});
+/* versão e desenvolvedor: exibidos em "Sobre o COORDIX" (botão ⓘ na barra superior), via coordixDesktop.info() */
