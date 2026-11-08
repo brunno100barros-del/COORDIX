@@ -18,6 +18,17 @@ const api = {
 contextBridge.exposeInMainWorld("coordixDesktop", Object.freeze(api));
 
 let ocupado = false;
+/* espera o aviso que o app mostra ao terminar a leitura ("Modelos lidos…") */
+function esperarLeitura(ms) {
+  return new Promise((ok) => {
+    const fim = setTimeout(() => { obs.disconnect(); ok(false); }, ms);
+    const obs = new MutationObserver(() => {
+      const t = document.querySelector(".toast");
+      if (t && /Modelos lidos/.test(t.textContent)) { clearTimeout(fim); obs.disconnect(); ok(true); }
+    });
+    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+}
 async function selecionarIfc() {
   if (ocupado) return;
   ocupado = true;
@@ -26,10 +37,17 @@ async function selecionarIfc() {
     if (!arquivos || !arquivos.length) return;
     const entrada = document.getElementById("fileInput");
     if (!entrada) return;
-    const dt = new DataTransfer();
-    for (const a of arquivos) dt.items.add(new File([a.bytes], a.nome, { type: "application/octet-stream", lastModified: a.modificado }));
-    entrada.files = dt.files;
-    entrada.dispatchEvent(new Event("change", { bubbles: true }));
+    // um arquivo por vez: o app limpa o <input> logo após o evento "change" (t.value = ""), e o Chromium
+    // esvazia a mesma lista de arquivos que a leitura ainda está percorrendo; entregando um por vez,
+    // todos os arquivos escolhidos são lidos, pelo mesmo caminho da versão web
+    for (const a of arquivos) {
+      const dt = new DataTransfer();
+      dt.items.add(new File([a.bytes], a.nome, { type: "application/octet-stream", lastModified: a.modificado }));
+      const lido = esperarLeitura(10 * 60 * 1000);
+      entrada.files = dt.files;
+      entrada.dispatchEvent(new Event("change", { bubbles: true }));
+      await lido;
+    }
   } catch (e) {
     console.error("COORDIX Desktop: falha ao abrir os arquivos IFC", e);
   } finally { ocupado = false; }

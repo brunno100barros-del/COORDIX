@@ -31,7 +31,10 @@ const PASSOS = {
     r.three = typeof THREE === 'object' && !!THREE.WebGLRenderer;
     r.canvas = !!$('#viewer canvas');
     await document.fonts.ready;
-    r.fontes = ['12px "IBM Plex Sans"', '12px "IBM Plex Mono"', '600 12px "IBM Plex Sans Condensed"'].map(f => document.fonts.check(f));
+    r.fontes = [];
+    for (const f of ['400 12px "IBM Plex Sans"', '400 12px "IBM Plex Mono"', '600 12px "IBM Plex Sans Condensed"']) {
+      try { r.fontes.push((await document.fonts.load(f, 'Ação')).length > 0 && document.fonts.check(f, 'Ação')); } catch (e) { r.fontes.push(false); }
+    }
     r.selo = $('#coordix-desktop-selo')?.innerText || null;
     r.telas = {};
     for (const v of ['projeto','modelos','visualizador','regras','clashes','revisao','issues','bcf']) {
@@ -54,7 +57,7 @@ const PASSOS = {
     $('[data-nav=modelos]')?.click(); await sl(600);
     const antes = document.querySelectorAll('#main tbody tr').length;
     $('#drop')?.click();
-    r.modelosCarregados = !!(await esperar(() => document.querySelectorAll('#main tbody tr').length > antes && (document.body.innerText.match(/FUMACA-/g) || []).length >= 2, 60000));
+    r.modelosCarregados = !!(await esperar(() => document.querySelectorAll('#main tbody tr').length >= antes + 2 && (document.body.innerText.match(/FUMACA-/g) || []).length >= 2, 120000));
     r.linhasModelos = [antes, document.querySelectorAll('#main tbody tr').length];
     r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\\n')[0]).filter(Boolean);
     await sl(1500); // gravação do localStorage (atraso de 250 ms no app) e fim de leitura
