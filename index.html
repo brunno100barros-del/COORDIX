@@ -349,6 +349,57 @@ pre.xml{margin:0;padding:14px;background:var(--surface-2);border:var(--bw) solid
 .toast::before{content:"";flex:none;width:6px;height:6px;background:var(--accent);transform:rotate(45deg)}
 @keyframes toast-in{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
 
+/* progresso de leitura e análise (não bloqueia a interface) */
+#progressPanel{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:45;width:min(380px,calc(100% - 32px));display:flex;flex-direction:column;gap:7px;
+  padding:12px 14px;background:var(--surface);border:var(--bw) solid var(--line-strong);border-radius:var(--r-2);box-shadow:var(--shadow-float);font-size:var(--fs-sm)}
+#progressPanel .pg-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+#progressPanel .pg-head b{font:600 var(--fs-2xs)/1.2 var(--font-mono);letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-2)}
+#progressPanel .pg-pct{font:600 var(--fs-md)/1 var(--font-mono);color:var(--accent)}
+#progressPanel .pg-bar{position:relative;height:4px;background:var(--surface-3);overflow:hidden}
+#progressPanel .pg-bar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);transition:width .15s linear}
+#progressPanel .pg-bar.indet i{width:28%;animation:pg-indet 1.2s var(--ease) infinite}
+@keyframes pg-indet{from{left:-28%}to{left:100%}}
+#progressPanel .pg-stage{color:var(--ink);font-weight:500}
+#progressPanel .pg-detail{font:500 var(--fs-xs)/1.3 var(--font-mono)}
+#progressPanel .btn{align-self:flex-end}
+
+/* menu Projeto e diálogos de confirmação */
+.pmenu{position:relative}
+.pmenu-list{position:absolute;left:0;top:calc(100% + 6px);z-index:60;min-width:270px;display:flex;flex-direction:column;padding:4px;background:var(--surface);border:var(--bw) solid var(--line-strong);border-radius:var(--r-2);box-shadow:var(--shadow-float)}
+.pmenu-list button{display:flex;align-items:center;justify-content:space-between;gap:16px;height:32px;padding:0 10px;border:0;background:none;text-align:left;cursor:pointer;font:500 var(--fs-md)/1 var(--font);color:var(--ink);border-radius:var(--r-1)}
+.pmenu-list button:hover,.pmenu-list button:focus-visible{background:var(--hover)}
+.pmenu-list button.danger{color:var(--p1)}
+.pmenu-list kbd{font-size:10px;color:var(--faint)}
+.pmenu-sep{height:var(--bw);background:var(--line);margin:4px 2px}
+.proj-file{font:500 var(--fs-2xs)/1 var(--font-mono);color:var(--muted);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.proj-file.dirty::after{content:" · não salvo";color:var(--accent)}
+#confirmDlg{width:min(480px,calc(100% - 32px));padding:0;border:var(--bw) solid var(--line-strong);border-radius:var(--r-2);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-float)}
+#confirmDlg::backdrop{background:rgba(8,10,13,.45)}
+#confirmDlg .about-body p{margin:0}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px;padding:12px var(--sp-4);border-top:var(--bw) solid var(--line);background:var(--surface-2)}
+.btn.danger{background:var(--p1);border-color:var(--p1);color:#fff;font-weight:600}
+.btn.danger:hover{filter:brightness(1.08)}
+.linked{display:flex;flex-direction:column;gap:0}
+.linked .lk{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:var(--bw) solid var(--line);font-size:var(--fs-sm)}
+.linked .lk:last-child{border-bottom:0}
+.linked .lk .nm{font-weight:500;min-width:180px}
+.linked .lk .grow{flex:1;min-width:120px}
+
+/* sobre o COORDIX (versão e desenvolvedor, para rastreabilidade e suporte) */
+.about-btn{display:grid;place-items:center;width:28px;height:28px;border:var(--bw) solid transparent;border-radius:var(--r-1);background:none;color:var(--faint);cursor:pointer}
+.about-btn:hover{color:var(--ink);background:var(--hover)}
+.about-btn svg{width:16px;height:16px}
+#aboutDlg{width:min(420px,calc(100% - 32px));padding:0;border:var(--bw) solid var(--line-strong);border-radius:var(--r-2);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-float)}
+#aboutDlg::backdrop{background:rgba(8,10,13,.45)}
+#aboutDlg .about-head{display:flex;align-items:center;justify-content:space-between;padding:8px 8px 8px var(--sp-4);border-bottom:var(--bw) solid var(--line);background:var(--surface-2);font:600 var(--fs-2xs)/1 var(--font-mono);letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--muted)}
+#aboutDlg .about-body{padding:var(--sp-4);display:flex;flex-direction:column;gap:10px}
+#aboutDlg .about-brand{display:flex;flex-direction:column;gap:3px}
+#aboutDlg .about-brand b{font:700 20px/1 var(--font-cond);letter-spacing:.14em}
+#aboutDlg .about-brand span{font:600 9px/1 var(--font-mono);letter-spacing:.26em;color:var(--muted)}
+#aboutDlg p{margin:0}
+.about-kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;margin:4px 0 0;font-size:var(--fs-sm)}
+.about-kv dt{color:var(--muted)} .about-kv dd{margin:0;font-family:var(--font-mono);font-size:12px}
+
 /* barras de rolagem discretas */
 *{scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
 
@@ -404,11 +455,26 @@ pre.xml{margin:0;padding:14px;background:var(--surface-2);border:var(--bw) solid
     <div class="projsel">
       <span class="lbl">Projeto</span>
       <select id="projectSelect" aria-label="Projeto"></select>
-      <button class="btn small ghost" id="newProjectBtn">+ Novo projeto</button>
+      <span class="proj-file" id="projFile" hidden></span>
+      <div class="pmenu">
+        <button class="btn small ghost" id="projMenuBtn" type="button" aria-haspopup="true" aria-expanded="false">Projeto <svg viewBox="0 0 10 10" width="9" height="9" fill="currentColor" aria-hidden="true"><path d="M1 3l4 4 4-4z"/></svg></button>
+        <div class="pmenu-list" id="projMenu" role="menu" hidden>
+          <button role="menuitem" id="newProjectBtn" type="button">Novo projeto</button>
+          <button role="menuitem" data-pact="abrir" type="button">Abrir projeto (.coordix)…<kbd>Ctrl+O</kbd></button>
+          <div class="pmenu-sep"></div>
+          <button role="menuitem" data-pact="salvar" type="button">Salvar projeto<kbd>Ctrl+S</kbd></button>
+          <button role="menuitem" data-pact="salvarComo" type="button">Salvar como…<kbd>Ctrl+Shift+S</kbd></button>
+          <div class="pmenu-sep"></div>
+          <button role="menuitem" data-pact="importarIfc" type="button">Importar modelos IFC…</button>
+          <div class="pmenu-sep"></div>
+          <button role="menuitem" data-pact="excluir" class="danger" type="button">Excluir projeto…</button>
+        </div>
+      </div>
     </div>
     <div class="grow"></div>
     <div class="tools">
       <button class="pill" id="reviewPill" hidden></button>
+      <button class="about-btn" id="aboutBtn" type="button" title="Sobre o COORDIX" aria-label="Sobre o COORDIX"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.2v4.1M8 4.9v.1"/></svg></button>
       <div class="theme-tg" role="group" aria-label="Tema da interface">
         <button type="button" data-theme-set="light" aria-pressed="false" title="Modo claro"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
         <button type="button" data-theme-set="dark" aria-pressed="false" title="Modo escuro"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M13.2 10.1A5.6 5.6 0 0 1 5.9 2.8a5.6 5.6 0 1 0 7.3 7.3z"/></svg></button>
@@ -434,6 +500,17 @@ pre.xml{margin:0;padding:14px;background:var(--surface-2);border:var(--bw) solid
   <div class="vstatus" id="vstatus">Carregando motor IFC…</div>
 </div>
 <input type="file" id="fileInput" accept=".ifc" multiple hidden>
+<input type="file" id="projInput" accept=".coordix,application/json" hidden>
+<input type="file" id="relinkInput" accept=".ifc" multiple hidden>
+<dialog id="confirmDlg" aria-labelledby="confirmTitle"><div class="about-head"><span id="confirmTitle"></span></div><div class="about-body" id="confirmBody"></div><div class="dlg-actions" id="confirmActions"></div></dialog>
+<dialog id="aboutDlg" aria-labelledby="aboutTitle">
+  <div class="about-head"><span id="aboutTitle">Sobre o COORDIX</span><button class="btn small ghost" type="button" data-about-close aria-label="Fechar">Fechar</button></div>
+  <div class="about-body">
+    <div class="about-brand"><b>COORDIX</b><span>BIMOFFICE</span></div>
+    <p class="muted">Coordenação BIM e detecção de interferências em modelos IFC.</p>
+    <dl class="about-kv" id="aboutKv"></dl>
+  </div>
+</dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
@@ -452,9 +529,9 @@ const CLASSES = {
 };
 const CLS_ORDER = ["P1","P2","P3","P4","INFO","FALSO"];
 
-const GROUPS = {EST:"Estrutura",ARQ:"Arquitetura",SAN:"Hidrossanitário",HVAC:"HVAC",ELE:"Elétrica",PCI:"Incêndio",FORRO:"Forro",MEP:"MEP",EQUIP:"Equipamentos"};
+const GROUPS = {EST:"Estrutura",MET:"Estrutura Metálica",ARQ:"Arquitetura",SAN:"Hidrossanitário",HVAC:"HVAC",ELE:"Elétrica",PCI:"Incêndio",FORRO:"Forro",MEP:"MEP",EQUIP:"Equipamentos"};
 const CODE_INFO = { // código no nome do arquivo → disciplina
-  EST:["Estrutura","EST"], ARQ:["Arquitetura","ARQ"], SAN:["Hidrossanitário","SAN"], HID:["Hidráulica","SAN"],
+  EST:["Estrutura","EST"], MET:["Estrutura Metálica","MET"], ARQ:["Arquitetura","ARQ"], SAN:["Hidrossanitário","SAN"], HID:["Hidráulica","SAN"],
   PCI:["Prevenção e combate a incêndio","PCI"], PSI:["Piscina","SAN"], ELE:["Elétrica","ELE"], SCE:["Cabeamento estruturado","ELE"],
   SPD:["SPDA","ELE"], SUB:["Subestação","ELE"], CLI:["Climatização","HVAC"], CON:["Climatização","HVAC"], HVAC:["HVAC","HVAC"],
 };
@@ -480,6 +557,14 @@ const DEFAULT_TESTS = [
   [19,"FORRO","MEP",25,"clearance","Autodesk Clearance Clash","Espaço de instalação"],
   [20,"EQUIP","MEP",30,"clearance","Autodesk Clearance Clash","Manutenção"],
   [21,"EQUIP","ARQ",30,"clearance","Autodesk Clearance Clash","Operação"],
+  // Estrutura Metálica (MET): testes próprios, com as tolerâncias dos testes de Estrutura, editáveis em separado
+  [22,"MET","MET",0,"hard","Autodesk + BEP Penn State","Consistência estrutural (metálica)"],
+  [23,"MET","EST",0,"hard","Autodesk + BEP Penn State","Interface estrutura metálica × concreto"],
+  [24,"MET","ARQ",5,"hard","Penn State BEP","Compatibilidade geométrica"],
+  [25,"MET","SAN",5,"hard","Autodesk Practice","Perfurações críticas"],
+  [26,"MET","HVAC",5,"hard","NBIMS/Autodesk","Interferências críticas"],
+  [27,"MET","ELE",5,"hard","NBIMS/Autodesk","Passagens estruturais"],
+  [28,"MET","PCI",5,"hard","NBIMS","Sistema essencial"],
 ].map(([ordem,a,b,tol,kind,fonte,just])=>({id:"t"+ordem,ordem,a,b,tol,kind,fonte,just,on:true}));
 
 const DEFAULT_ENTITY_NAMES = {
@@ -517,7 +602,7 @@ const RULES = [
   {id:"r_fit", cls:"FALSO", cond:"Conexão × trecho do mesmo sistema (MEP)", reason:"Sobreposição de conexão com o próprio trecho — interferência de modelagem conhecida.",
     test:(c,A,B)=>c.kind==="hard" && A.group===B.group && ((FITTING.has(A.cls)&&LINEAR.has(B.cls))||(FITTING.has(B.cls)&&LINEAR.has(A.cls))||(FITTING.has(A.cls)&&FITTING.has(B.cls))) && (!A.system||!B.system||A.system===B.system)},
   {id:"r_node", cls:"FALSO", cond:"Encontro entre peças estruturais do mesmo modelo", reason:"Nó de pórtico (viga × viga, viga × pilar, laje × viga) no mesmo arquivo de estrutura.",
-    test:(c,A,B)=>A.model===B.model && A.group==="EST" && STRUCT_ALL.has(A.cls) && STRUCT_ALL.has(B.cls)},
+    test:(c,A,B)=>A.model===B.model && isStruct(A) && STRUCT_ALL.has(A.cls) && STRUCT_ALL.has(B.cls)},
   {id:"r_emb", cls:"FALSO", cond:"Dispositivo embutido em parede/vedação", reason:"Tomada, caixa, quadro ou terminal embutido na vedação, previsto em projeto.",
     test:(c,A,B)=>(EMBEDDED.has(A.cls)&&WALLS.has(B.cls)&&B.group==="ARQ")||(EMBEDDED.has(B.cls)&&WALLS.has(A.cls)&&A.group==="ARQ")},
   {id:"r_clear", cls:"INFO", cond:"Teste de folga (clearance) sem interferência física", reason:"Folga menor que a exigida, mas os elementos não se tocam.",
@@ -535,7 +620,7 @@ const RULES = [
   {id:"r_main", cls:"P2", cond:"Redes principais de disciplinas diferentes", reason:"Conflito entre redes principais — afeta mais de uma disciplina.",
     test:(c,A,B)=>LINEAR.has(A.cls)&&LINEAR.has(B.cls)&&A.code!==B.code&&mainSize(A)>60&&mainSize(B)>60},
   {id:"r_arqest", cls:"P4", cond:"Arquitetura × estrutura", reason:"Vedação encostando na estrutura — erro de modelagem sem impacto construtivo.",
-    test:(c,A,B)=>(A.group==="ARQ"&&B.group==="EST")||(A.group==="EST"&&B.group==="ARQ")},
+    test:(c,A,B)=>(A.group==="ARQ"&&isStruct(B))||(isStruct(A)&&B.group==="ARQ")},
   {id:"r_marg", cls:"P4", cond:"Espessura de interferência até 2× a tolerância", reason:"Interferência marginal, próxima da tolerância estabelecida.",
     test:(c)=>c.kind==="hard" && c.value<=2*Math.max(c.tol,5)},
   {id:"r_light", cls:"P3", cond:"Luminária × qualquer elemento", reason:"Reposicionamento de luminária.",
@@ -547,9 +632,10 @@ const RULES = [
   {id:"r_def", cls:"P3", cond:"Demais casos", reason:"Impacto localizado e controlável.", test:()=>true},
 ];
 function isMep(e){return ["SAN","HVAC","ELE","PCI"].includes(e.group)}
+function isStruct(e){return e.group==="EST"||e.group==="MET"} // estrutura de concreto ou metálica
 function mainSize(e){const s=[e.size[0],e.size[1],e.size[2]].sort((a,b)=>a-b);return s[1]}
 
-const FLEX_ORDER = ["EST","ARQ","SAN","PSI","PCI","CLI","CON","HVAC","ELE","SUB","SPD","SCE"];
+const FLEX_ORDER = ["EST","MET","ARQ","SAN","PSI","PCI","CLI","CON","HVAC","ELE","SUB","SPD","SCE"];
 
 /* ===================================================================== */
 /*  Estado e persistência                                                 */
@@ -591,9 +677,12 @@ let DB;
 try{DB=JSON.parse(localStorage.getItem(STORE_KEY)||"null")}catch(e){DB=null}
 if(!DB||!DB.projects){DB={projects:[exampleProject()],current:"exemplo",view:"projeto"}}
 if(!DB.projects.find(p=>p.id==="exemplo")) DB.projects.unshift(exampleProject());
-for(const p of DB.projects){const d=defaultSettings();for(const k in d) if(p[k]===undefined) p[k]=d[k]}
+for(const p of DB.projects){const d=defaultSettings();for(const k in d) if(p[k]===undefined) p[k]=d[k];
+  // acréscimos de versões novas (nada existente é alterado): testes padrão ausentes e siglas novas na ordem de flexibilidade
+  for(const t of DEFAULT_TESTS) if(!p.tests.some(x=>x.id===t.id)) p.tests.push({...t});
+  if(!p.flexOrder.includes("MET")){const i=p.flexOrder.indexOf("EST");p.flexOrder.splice(i<0?0:i+1,0,"MET")}}
 let saveT=0;
-function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(STORE_KEY,JSON.stringify(DB))}catch(e){}},250)}
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(STORE_KEY,JSON.stringify(DB))}catch(e){}if(typeof renderProjFile==="function") renderProjFile()},250)}
 const proj=()=>DB.projects.find(p=>p.id===DB.current)||DB.projects[0];
 
 /* Estado de sessão (modelos e clashes não são persistidos neste protótipo) */
@@ -637,18 +726,23 @@ function coordinator(){return proj().team.find(m=>m.coord)||proj().team[0]||{nam
 /*  Motor IFC (web-ifc) e visualizador (three.js)                         */
 /* ===================================================================== */
 let WEBIFC=null, api=null, engineError=null;
+const WEBIFC_VERSION="0.0.78", WEBIFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEBIFC_VERSION}/`;
+// círculos com 24 segmentos (padrão do leitor: 12). Polígono inscrito: com 12 lados um tubo Ø100 perde até
+// 1,7 mm de raio; com 24, 0,4 mm — mais fiel na análise e no desenho de tubos, conexões e chumbadores
+const IFC_LOADER_SETTINGS={COORDINATE_TO_ORIGIN:false,CIRCLE_SEGMENTS:24};
 const TYPE_NAME={};
 const vec=v=>{if(!v) return []; if(Array.isArray(v)) return v; const out=[];const n=v.size();for(let i=0;i<n;i++) out.push(v.get(i));return out};
 const val=a=>a==null?null:(typeof a==="object"&&"value" in a)?a.value:a;
 
 async function initEngine(){
   try{
-    WEBIFC = await import("https://cdn.jsdelivr.net/npm/web-ifc@0.0.39/web-ifc-api.js");
-    for(const [k,v] of Object.entries(WEBIFC)) if(/^IFC[A-Z0-9]+$/.test(k)&&typeof v==="number") TYPE_NAME[v]=k;
+    // leitor IFC: web-ifc 0.0.78 (lê IFC2X3, IFC4 e IFC4X3; geometria de curvas, varreduras e conexões
+    // muito mais robusta que a 0.0.39). API e .wasm da MESMA versão; no desktop, servidos por cópia local.
+    WEBIFC = await import(`${WEBIFC_BASE}web-ifc-api.js`);
+    for(const [k,v] of Object.entries(WEBIFC)) if(/^IFC[A-Z0-9_]+$/.test(k)&&typeof v==="number") TYPE_NAME[v]=k;
     api = new WEBIFC.IfcAPI();
-    const base = new URL("./", location.href).href;
-    try{api.SetWasmPath(base,true)}catch(e){api.SetWasmPath(base)}
-    await api.Init((path)=> path.endsWith(".wasm") ? base+"web-ifc.wasm" : path);
+    api.SetWasmPath(WEBIFC_BASE,true);
+    await api.Init((path)=> path.endsWith(".wasm") ? WEBIFC_BASE+"web-ifc.wasm" : path, true);
     setStatus("Motor IFC pronto.");
   }catch(e){
     engineError=e; console.error(e);
@@ -715,29 +809,44 @@ function setViewerMsg(t){const m=$("#vmsg");if(m) m.innerHTML=t||""}
 function mountViewer(slot){const v=$("#viewer");v.hidden=false;slot.appendChild(v);resizeViewer()}
 
 /* --- leitura de um modelo --- */
-let GLOBAL_OFFSET=null;
-async function loadIfc(projectId, file, bytes){
+/* Origem local do PROJETO (metros, eixo Y para cima): subtraída de todas as coordenadas dos IFCs do projeto,
+   preservando a posição relativa entre eles. Definida pelo 1º modelo lido com sucesso (centro robusto: mediana
+   dos centros dos elementos, imune a elementos isolados na origem) e guardada no projeto. A análise usa Float64
+   relativo a esta origem; o desenho usa Float32 relativo ao centro de cada malha (sem perda de precisão). */
+function projOffset(pid){const P=DB.projects.find(p=>p.id===pid);return P&&Array.isArray(P.origemLocal)?P.origemLocal:null}
+const median=a=>{if(!a.length) return 0;const s=Float64Array.from(a).sort();const h=s.length>>1;return s.length%2?s[h]:(s[h-1]+s[h])/2};
+async function loadIfc(projectId, file, bytes, origem){
   const list=S.models[projectId]||(S.models[projectId]=[]);
   const code=codeFromFile(file);
   const m={id:uid(),projectId,file,code,disc:(CODE_INFO[code]||["A definir"])[0],group:(CODE_INFO[code]||[null,null])[1],
-    status:"lendo",progress:0,elems:[],chunks:[],storeys:[],building:"",visible:true,error:null,size:bytes.byteLength};
+    status:"lendo",progress:0,elems:[],chunks:[],storeys:[],building:"",visible:true,error:null,size:bytes.byteLength,
+    caminho:origem&&origem.caminho||null,sha256:origem&&origem.sha256||null};
   list.push(m);renderAll();
+  if(!m.sha256) m.sha256=await sha256Hex(bytes); // assinatura do arquivo: o projeto reconhece o mesmo IFC ao reabrir
   if(engineError||!api){m.status="erro";m.error="Motor IFC indisponível";renderAll();return m}
   await new Promise(r=>setTimeout(r,30));
   try{
     try{const head=new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4000,bytes.byteLength)));const mm=head.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i);m.schema=mm?mm[1]:""}catch(e){}
     m.stage="abertura do arquivo";
-    const mid=api.OpenModel(new Uint8Array(bytes),{COORDINATE_TO_ORIGIN:false,USE_FAST_BOOLS:true});
+    await loadStage(`Abrindo ${file} (leitura do IFC)`);
+    const mid=api.OpenModel(new Uint8Array(bytes),IFC_LOADER_SETTINGS);
+    bytes=null; // o leitor já copiou o arquivo: libera o original (arquivos grandes)
+    if(mid<0) throw new Error("o leitor IFC não conseguiu abrir o arquivo");
     m.mid=mid;
+    await loadStage("Lendo pavimentos, PropertySets, tipos e sistemas");
     indexModel(m);
     m.progress=.25;renderModelsProgress();
-    await new Promise(r=>setTimeout(r,0));
+    await loadStage("Gerando a geometria 3D dos elementos");
     buildGeometry(m);
     m.status="pronto";m.progress=1;
+    progress.detail(`${m.elems.length.toLocaleString("pt-BR")} elementos com geometria em ${file}`);
+    await loadStage("Montando a visualização");
     if(projectId===DB.current){attachModel(m);setViewerMsg("")}
     renderAll();
     if(projectId===DB.current && list.filter(x=>x.status==="pronto").length===1) fitView();
-  }catch(e){console.error(e);m.status="erro";m.error=`${e.message||e} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll()}
+    linkModelRef(projectId,m);
+  }catch(e){console.error(e);m.status="erro";m.error=`${ifcErrorText(e)} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll();
+    toast(`Não foi possível ler ${file}: ${m.error}`)}
   return m;
 }
 
@@ -811,7 +920,7 @@ function buildGeometry(m){
   const mid=m.mid,T=WEBIFC;
   const ids=code=>code==null?[]:vec(api.GetLineIDsWithType(mid,code));
   const perEl=new Map(); // eid → {geoms:[{p,n,i,color}]}
-  let origin=null;
+  let origin=null;const cx=[],cy=[],cz=[]; // centros dos elementos (para a origem robusta)
   let rawMin=[Infinity,Infinity,Infinity],rawMax=[-Infinity,-Infinity,-Infinity];
   m.stage="geometria";
   m.geoFailures=[];m.unprocessed=[];
@@ -830,14 +939,17 @@ function buildGeometry(m){
     const r=GEOC.readElementGeometries(refs,reader); // cada falha é registrada; recursos liberados em finally
     for(const f of r.failures) m.geoFailures.push({eid,geometryExpressID:f.ref&&f.ref.geometryExpressID,stage:f.stage,reason:f.reason});
     if(!r.geoms.length){m.unprocessed.push({eid,reason:r.failures.map(f=>`${f.stage}: ${f.reason}`).join("; ")||"sem representação"});return}
+    let ex0=Infinity,ey0=Infinity,ez0=Infinity,ex1=-Infinity,ey1=-Infinity,ez1=-Infinity;
     for(const g of r.geoms){
       const c=g.ref.color;g.c=[c.x,c.y,c.z,c.w];delete g.ref;
       const W=g.w;
       for(let k=0;k<W.length;k+=3){const X=W[k],Y=W[k+1],Z=W[k+2];
-        if(X<rawMin[0])rawMin[0]=X;if(Y<rawMin[1])rawMin[1]=Y;if(Z<rawMin[2])rawMin[2]=Z;
-        if(X>rawMax[0])rawMax[0]=X;if(Y>rawMax[1])rawMax[1]=Y;if(Z>rawMax[2])rawMax[2]=Z;
+        if(X<ex0)ex0=X;if(Y<ey0)ey0=Y;if(Z<ez0)ez0=Z;if(X>ex1)ex1=X;if(Y>ey1)ey1=Y;if(Z>ez1)ez1=Z;
         if(!origin) origin=[X,Y,Z]}
     }
+    if(ex0<=ex1){if(ex0<rawMin[0])rawMin[0]=ex0;if(ey0<rawMin[1])rawMin[1]=ey0;if(ez0<rawMin[2])rawMin[2]=ez0;
+      if(ex1>rawMax[0])rawMax[0]=ex1;if(ey1>rawMax[1])rawMax[1]=ey1;if(ez1>rawMax[2])rawMax[2]=ez1;
+      cx.push((ex0+ex1)/2);cy.push((ey0+ey1)/2);cz.push((ez0+ez1)/2)}
     perEl.set(eid,{geoms:r.geoms,integrity:r.integrity,failures:r.failures.map(f=>({geometryExpressID:f.ref&&f.ref.geometryExpressID,stage:f.stage,reason:f.reason}))});
   });
   // produtos com representação para os quais o leitor não gerou nenhuma malha (não podem sumir em silêncio)
@@ -860,22 +972,31 @@ function buildGeometry(m){
   m.unitScale=s;m.unitInfo=Object.assign({},us,{readerConverts,check:det});m.rawOrigin=origin;m.geoFlags=m.geoFlags||[];m.lengthScale=us.declaredScale||1;
   if(us.status!=="declarada"){m.unitUnsupported=true;m.geoFlags.push(us.status==="ausente"?"O arquivo não declara unidade de comprimento: resultados geométricos marcados como inconclusivos":us.status==="ambigua"?`Unidades de comprimento conflitantes (${us.label}): resultados geométricos marcados como inconclusivos`:`Unidade de comprimento não suportada (${us.label}): resultados geométricos marcados como inconclusivos`)}
   else{
-    if(det.converts===null&&Math.abs((lu.scale||1)-1)>1e-12) m.geoFlags.push(`Conversão de unidade pelo leitor assumida (comportamento do web-ifc 0.0.39); não foi possível verificá-la neste arquivo`);
+    if(det.converts===null&&Math.abs((lu.scale||1)-1)>1e-12) m.geoFlags.push(`Conversão de unidade pelo leitor assumida (comportamento do leitor IFC); não foi possível verificá-la neste arquivo`);
     const pl=GEOC.checkScalePlausibility(ext*s);
     if(!pl.ok){m.unitUnsupported=true;m.geoFlags.push(`Escala suspeita: com a unidade declarada (${us.label}) o modelo mede ${fmt(ext*s,3)} m — possível conversão duplicada; resultados marcados como inconclusivos`)}
   }
   m.unitLabel=us.label;
-  const o=[origin[0]*s,origin[1]*s,origin[2]*s];
-  if(!GLOBAL_OFFSET) GLOBAL_OFFSET=o.map(v=>Math.round(v));
-  let farMax=0;
+  // centro robusto do modelo (mediana dos centros dos elementos, em metros)
+  const centro=[median(cx)*s,median(cy)*s,median(cz)*s];
+  const Pj=DB.projects.find(p=>p.id===m.projectId);
+  let OFF=projOffset(m.projectId);
+  if(!OFF){
+    // 1º vértice do modelo (mesma referência das versões anteriores: resultados idênticos), salvo se ele for um ponto
+    // isolado longe do modelo (ex.: um elemento perdido na origem interna); nesse caso, o centro robusto
+    const pv=[origin[0]*s,origin[1]*s,origin[2]*s];
+    OFF=(Math.hypot(pv[0]-centro[0],pv[1]-centro[1],pv[2]-centro[2])>GEOC.GEO.FAR_COORD?centro:pv).map(v=>Math.round(v));
+    if(Pj){Pj.origemLocal=OFF;save()}}
+  m.offset=OFF;
+  // modelo em outro sistema de coordenadas (ex.: um IFC em coordenadas compartilhadas/UTM e outro na origem interna)
+  const dist=Math.hypot(centro[0]-OFF[0],centro[1]-OFF[1],centro[2]-OFF[2]);
+  if(dist>GEOC.GEO.FAR_COORD) m.geoFlags.push(`Este modelo está a ${fmt(dist/1000,1)} km dos demais modelos do projeto: provavelmente foi exportado em outro sistema de coordenadas (compartilhadas × internas). A posição foi mantida como está no arquivo; confira a exportação`);
   for(const rec of perEl.values()) for(const g of rec.geoms){
     const W=g.w,P64=new Float64Array(W.length);
-    for(let k=0;k<W.length;k+=3){P64[k]=W[k]*s-GLOBAL_OFFSET[0];P64[k+1]=W[k+1]*s-GLOBAL_OFFSET[1];P64[k+2]=W[k+2]*s-GLOBAL_OFFSET[2];
-      const f=Math.max(Math.abs(P64[k]),Math.abs(P64[k+1]),Math.abs(P64[k+2]));if(f>farMax) farMax=f}
-    g.p64=P64;g.p=Float32Array.from(P64);delete g.w; // p (Float32) só para desenho e seleção; p64 para a análise
+    for(let k=0;k<W.length;k+=3){P64[k]=W[k]*s-OFF[0];P64[k+1]=W[k+1]*s-OFF[1];P64[k+2]=W[k+2]*s-OFF[2]}
+    g.p64=P64;delete g.w; // Float64 relativo à origem do projeto (análise); o desenho é gerado relativo ao centro de cada malha
   }
-  if(farMax>GEOC.GEO.FAR_COORD) m.geoFlags.push(`Coordenadas a ${fmt(farMax/1000,1)} km da origem comum do projeto: a visualização perde precisão; a análise geométrica usa precisão dupla`);
-  m.storeysY=m.storeys.map(st=>({...st,y:st.elev*m.lengthScale-GLOBAL_OFFSET[1]}));
+  m.storeysY=m.storeys.map(st=>({...st,y:st.elev*m.lengthScale-OFF[1]}));
   const chunks=new Map();
   for(const [eid,rec] of perEl){
     let l;try{l=api.GetLine(mid,eid,false)}catch(e){m.skipped["elemento sem atributos"]=(m.skipped["elemento sem atributos"]||0)+1;l={type:null,expressID:eid}}
@@ -896,16 +1017,17 @@ function buildGeometry(m){
     ELEMS.push(el);m.elems.push(el.idx);
     for(const g of rec.geoms){
       const key=g.c.map(v=>v.toFixed(3)).join(",");
-      const ch=chunks.get(key)||{c:g.c,parts:[],nv:0,ni:0};ch.parts.push({g,idx:el.idx});ch.nv+=g.p.length/3;ch.ni+=g.i.length;chunks.set(key,ch);
+      const ch=chunks.get(key)||{c:g.c,parts:[],nv:0,ni:0};ch.parts.push({g,idx:el.idx});ch.nv+=g.p64.length/3;ch.ni+=g.i.length;chunks.set(key,ch);
     }
   }
   for(const ch of chunks.values()){
     const P=new Float32Array(ch.nv*3),N=new Float32Array(ch.nv*3),E=new Float32Array(ch.nv),I=new Uint32Array(ch.ni);
+    const ctr=partsCenter(ch.parts.map(x=>x.g));
     let vo=0,io=0;
     for(const {g,idx} of ch.parts){
-      P.set(g.p,vo*3);N.set(g.n,vo*3);E.fill(idx,vo,vo+g.p.length/3);
+      const n=g.p64.length/3;writeRel(P,vo*3,g.p64,ctr);N.set(g.n,vo*3);E.fill(idx,vo,vo+n);
       for(let k=0;k<g.i.length;k++) I[io+k]=g.i[k]+vo;
-      vo+=g.p.length/3;io+=g.i.length;
+      vo+=n;io+=g.i.length;
     }
     const geo=new THREE.BufferGeometry();
     geo.setAttribute("position",new THREE.BufferAttribute(P,3));geo.setAttribute("normal",new THREE.BufferAttribute(N,3));
@@ -913,25 +1035,32 @@ function buildGeometry(m){
     const op=ch.c[3];
     const mat=new THREE.MeshLambertMaterial({color:new THREE.Color(ch.c[0],ch.c[1],ch.c[2]),transparent:op<1,opacity:op,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
     mat.userData.base={op,transparent:op<1};
-    const mesh=new THREE.Mesh(geo,mat);mesh.userData.model=m.id;
+    const mesh=new THREE.Mesh(geo,mat);mesh.userData.model=m.id;mesh.position.set(ctr[0],ctr[1],ctr[2]);
     m.chunks.push(mesh);
   }
 }
+/* desenho "relativo ao centro": vértices em Float32 relativos ao centro da malha; o centro fica na posição do
+   objeto (dupla precisão). Assim a precisão do desenho não depende da distância até a origem. */
+function partsCenter(gs){let x0=Infinity,y0=Infinity,z0=Infinity,x1=-Infinity,y1=-Infinity,z1=-Infinity;
+  for(const g of gs){const P=g.p64;for(let k=0;k<P.length;k+=3){const X=P[k],Y=P[k+1],Z=P[k+2];if(X<x0)x0=X;if(Y<y0)y0=Y;if(Z<z0)z0=Z;if(X>x1)x1=X;if(Y>y1)y1=Y;if(Z>z1)z1=Z}}
+  return x0<=x1?[(x0+x1)/2,(y0+y1)/2,(z0+z1)/2]:[0,0,0]}
+function writeRel(dst,o,P,c){for(let k=0;k<P.length;k+=3){dst[o+k]=P[k]-c[0];dst[o+k+1]=P[k+1]-c[1];dst[o+k+2]=P[k+2]-c[2]}}
 function attachModel(m){for(const c of m.chunks){c.visible=m.visible;V.root.add(c)}V.dirty=true}
 function detachAll(){for(const c of [...V.root.children]) V.root.remove(c);clearHL();V.dirty=true}
 function attachProject(pid){detachAll();for(const m of (S.models[pid]||[])) if(m.status==="pronto") attachModel(m);applyGhost();setViewerMsg((S.models[pid]||[]).length?"":"Nenhum modelo carregado neste projeto. Envie IFCs em Modelos IFC.")}
 
 /* --- seleção, destaque, isolamento --- */
 function subsetMesh(idxs,color,{offset=0,useOwn=false}={}){
-  let nv=0,ni=0;for(const i of idxs) for(const g of ELEMS[i].geoms){nv+=g.p.length/3;ni+=g.i.length}
+  let nv=0,ni=0;for(const i of idxs) for(const g of ELEMS[i].geoms){nv+=g.p64.length/3;ni+=g.i.length}
+  const ctr=partsCenter(idxs.flatMap(i=>ELEMS[i].geoms));
   const P=new Float32Array(nv*3),N=new Float32Array(nv*3),E=new Float32Array(nv),C=useOwn?new Float32Array(nv*3):null,I=new Uint32Array(ni);let vo=0,io=0;
-  for(const i of idxs) for(const g of ELEMS[i].geoms){const n=g.p.length/3;P.set(g.p,vo*3);N.set(g.n,vo*3);E.fill(i,vo,vo+n);
+  for(const i of idxs) for(const g of ELEMS[i].geoms){const n=g.p64.length/3;writeRel(P,vo*3,g.p64,ctr);N.set(g.n,vo*3);E.fill(i,vo,vo+n);
     if(C) for(let k=0;k<n;k++){C[(vo+k)*3]=g.c[0];C[(vo+k)*3+1]=g.c[1];C[(vo+k)*3+2]=g.c[2]}
     for(let k=0;k<g.i.length;k++) I[io+k]=g.i[k]+vo;vo+=n;io+=g.i.length}
   const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.BufferAttribute(P,3));geo.setAttribute("normal",new THREE.BufferAttribute(N,3));
   geo.setAttribute("eid",new THREE.BufferAttribute(E,1));if(C) geo.setAttribute("color",new THREE.BufferAttribute(C,3));geo.setIndex(new THREE.BufferAttribute(I,1));
   const mat=new THREE.MeshLambertMaterial({color:useOwn?0xffffff:color,vertexColors:useOwn,side:THREE.DoubleSide,polygonOffset:offset!==0,polygonOffsetFactor:offset,polygonOffsetUnits:offset*4});
-  return new THREE.Mesh(geo,mat);
+  const mesh=new THREE.Mesh(geo,mat);mesh.position.set(ctr[0],ctr[1],ctr[2]);return mesh;
 }
 function clearGroup(gr){for(const c of [...gr.children]){gr.remove(c);c.geometry.dispose();c.material.dispose()}V.dirty=true}
 function clearHL(){clearGroup(V.hl)}
@@ -956,8 +1085,12 @@ function isolate(idxs){
 }
 function clearIsolation(){clearGroup(V.iso);setGhost(false)}
 function boxOf(idxs){const b=new THREE.Box3();for(const i of idxs) b.union(ELEMS[i].box);return b}
+/* diagnóstico somente leitura (usado pelo teste de fumaça): origem do projeto e maior coordenada dos vértices desenhados */
+window.coordixDiagnostico=()=>{let vMax=0,pMax=0;for(const c of V.root.children){const a=c.geometry&&c.geometry.attributes.position;if(!a) continue;
+  for(let k=0;k<a.array.length;k++){const v=Math.abs(a.array[k]);if(v>vMax)vMax=v}pMax=Math.max(pMax,Math.abs(c.position.x),Math.abs(c.position.y),Math.abs(c.position.z))}
+  return {projeto:DB.current,origem:projOffset(DB.current),maiorVertice:vMax,maiorPosicaoMalha:pMax,malhas:V.root.children.length}};
 function fitView(box){
-  if(!box){box=new THREE.Box3();for(const c of V.root.children) if(c.visible){c.geometry.computeBoundingBox();box.union(c.geometry.boundingBox)}}
+  if(!box){box=new THREE.Box3();for(const c of V.root.children) if(c.visible) box.expandByObject(c)} // caixa no mundo (malhas relativas ao centro)
   if(box.isEmpty()) return;
   const c=box.getCenter(new THREE.Vector3()),r=Math.max(box.getSize(new THREE.Vector3()).length()/2,0.6);
   const dir=V.camera.position.clone().sub(V.controls.target).normalize();if(dir.lengthSq()<.5) dir.set(1,.8,1).normalize();
@@ -988,7 +1121,7 @@ function takeSnapshot(){
 }
 function cameraViewpoint(){
   // display (Y para cima, deslocado) → coordenadas IFC (Z para cima, metros)
-  const o=GLOBAL_OFFSET||[0,0,0];
+  const o=projOffset(DB.current)||[0,0,0];
   const p=V.camera.position,d=V.controls.target.clone().sub(p).normalize();
   const toIfc=(x,y,z)=>[x,-z,y];
   const P=toIfc(p.x+o[0],p.y+o[1],p.z+o[2]),D=toIfc(d.x,d.y,d.z);
@@ -1048,7 +1181,7 @@ function extraFields(el){
   return [["Nome",el.name],["Classe IFC",ifcPretty(el.cls)],["PredefinedType",el.predef],["Sistema",el.system],["Tag",el.tag],
     ["Dimensões (mm)",el.size.map(v=>fmt(v)).join(" × ")],
     ["Integridade geométrica",el.geoIntegrity==="parcial"?`parcial — ${(el.geoFailures||[]).length} representação(ões) não lida(s)`:el.geoIntegrity==="completa"?"completa":""],
-    ["Topologia da malha",el._solid?({solido_valido:"sólido válido",aberta:"malha aberta",invalida:"malha inválida",superficie:"superfície sem volume"}[el._solid.topology]||el._solid.topology):""]];
+    ["Topologia da malha",(el._solid||el._topo)?({solido_valido:"sólido válido",aberta:"malha aberta",invalida:"malha inválida",superficie:"superfície sem volume"}[el._solid?el._solid.topology:el._topo]||(el._solid?el._solid.topology:el._topo)):""]];
 }
 
 /* ===================================================================== */
@@ -1085,6 +1218,7 @@ function pairKey(a,b){return [a.guid,b.guid].sort().join("|")}
 const GEOC=window.CoordixGeo;
 const GEO_LABEL={confirmado:"Confirmado",abaixo_tolerancia:"Abaixo da tolerância",contato:"Contato",sem_conflito:"Sem conflito",inconclusivo:"Inconclusivo",incompleto:"Análise incompleta"};
 const GEO_FLAG={
+  falha_avaliacao:"falha interna ao avaliar o par (resultado tratado como inconclusivo)",
   malha_aberta:"malha aberta (superfície não fecha um volume)",orientacao_inconsistente:"orientação das faces inconsistente",superficie_sem_volume:"elemento só de superfície, sem volume",
   triangulos_degenerados:"triângulos degenerados ignorados",sem_geometria_valida:"sem geometria válida",contencao_ambigua:"classificação dentro/fora ambígua em parte da região",
   contencao_ou_coincidencia:"um elemento está contido no outro ou há faces coincidentes",espessura_com_lacuna:"espessura com intervalo de incerteza (limite de avaliações)",
@@ -1122,16 +1256,17 @@ function geoChip(c){
   if(g.metricQuality==="estimada") return ` <span class="chip outline" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">estimado</span>`;
   return g.quality==="aproximada"?` <span class="chip outline" title="${esc((g.flags||[]).map(geoFlagText).join("; "))}">aprox.</span>`:"";
 }
-function runAnalysis(){
+async function runAnalysis(){
   const P=proj();const models=(S.models[P.id]||[]).filter(m=>m.status==="pronto");
   if(!models.length){toast("Carregue ao menos um modelo IFC.");return}
+  if(AN.running){toast("Já existe uma análise em andamento.");return}
   const t0=performance.now();
   const all=models.flatMap(m=>m.elems.map(i=>ELEMS[i]));
   const excluded=[];const pool=[];
   for(const el of all){const why=excludedBy(el,P);if(why) excluded.push({el,why});else pool.push(el)}
   const found=new Map();
   const tests=P.tests.filter(t=>t.on).sort((a,b)=>a.ordem-b.ordem);
-  let below=0,rejected=0,nNarrow=0;const checked=new Set(),geoStats={};
+  let below=0,rejected=0,nNarrow=0;const checked=new Set(),geoStats={},jobs=[];
   for(const t of tests){
     const A=pool.filter(e=>inGroup(e,t.a)),B=pool.filter(e=>inGroup(e,t.b));
     if(!A.length||!B.length) continue;
@@ -1151,7 +1286,21 @@ function runAnalysis(){
         const key=a.idx<b.idx?a.idx+"|"+b.idx:b.idx+"|"+a.idx; // por índice: GUIDs repetidos não somem da análise
         if(checked.has(key+"|"+t.id)) continue;
         checked.add(key+"|"+t.id);nNarrow++;
-        const r=GEOC.evaluatePair(solidOf(a),solidOf(b),{kind:t.kind,tol,volume:false}); // volume: calculado ao abrir o clash
+        jobs.push({a,b,t,tol,key});
+      }
+    }
+  }
+  // avaliação geométrica dos pares em segundo plano (Web Worker), com progresso real e cancelamento;
+  // mesmos pares, mesma ordem, mesmo núcleo e mesmas opções — volume: calculado ao abrir o clash
+  let results;
+  try{results=await evaluatePairs(jobs,{elements:all.length,pool:pool.length})}
+  catch(e){
+    if(e&&e.cancelado){toast("Análise cancelada. Os resultados anteriores foram mantidos.");return}
+    console.error(e);toast(`A análise foi interrompida: ${(e&&e.message)||e}. Os resultados anteriores foram mantidos.`);return;
+  }
+  for(let ji=0;ji<jobs.length;ji++){
+    const {a,b,t,key}=jobs[ji];let r=results[ji];
+        if(r&&r.erro!==undefined) r=failedPair(r.erro); // falha interna no par: nunca vira "sem conflito"
         // unidade não confirmada: a escala é desconhecida, então nenhuma comparação com a tolerância vale
         if((a.m.unitUnsupported||b.m.unitUnsupported)&&r.state!=="incompleto"){r.state="inconclusivo";r.metricQuality="indisponivel";r.flags.push("unidade_nao_suportada")}
         geoStats[r.state]=(geoStats[r.state]||0)+1;
@@ -1167,8 +1316,6 @@ function runAnalysis(){
         if(prev){const rank=x=>x.geo.state==="confirmado"?2:1;const keep=rank(item)>rank(prev)?item:prev,other=keep===item?prev:item;
           keep.geo.otherTests=[...(keep.geo.otherTests||[]),...(other.geo.otherTests||[]),{testName:other.testName,state:other.geo.state,tol:other.tol}];found.set(key,keep);continue}
         found.set(key,item);
-      }
-    }
   }
   const list=[...found.values()];
   for(const c of list){prepareClash(c,P)}
@@ -1186,9 +1333,90 @@ function runAnalysis(){
   const doubt=(geoStats.inconclusivo||0)+(geoStats.incompleto||0);
   toast(`${list.length} clashes encontrados · ${pend} aguardando sua revisão${doubt?` · ${doubt} com resultado geométrico a verificar`:""}.`);
 }
+/* ---------- análise em segundo plano: Web Worker, progresso e cancelamento ---------- */
+const AN={worker:null,sent:new Set(),running:null,exec:0};
+function failedPair(msg){
+  return {state:"inconclusivo",value:null,lb:null,ub:null,volume:null,extent:null,quality:"indisponivel",metricQuality:"indisponivel",
+    flags:["falha_avaliacao"],method:"erro",evidence:"falha ao avaliar: "+msg,bounds:null,center:null};
+}
+function analysisWorker(){
+  if(AN.worker) return AN.worker;
+  try{AN.worker=new Worker("coordix-analise-worker.js");AN.sent=new Set()}catch(e){console.warn("COORDIX: Web Worker indisponível; análise na linha principal",e);AN.worker=null}
+  return AN.worker;
+}
+function resetAnalysisWorker(){if(AN.worker){AN.worker.terminate();AN.worker=null}AN.sent=new Set()}
+function forgetAnalysisMeshes(idxs){if(AN.worker){AN.worker.postMessage({tipo:"descartar",idx:idxs});for(const i of idxs) AN.sent.delete(i)}}
+const STAGE_LABEL={pares:"Selecionando pares candidatos",malhas:"Preparando malhas (topologia e índice espacial)",avaliar:"Avaliando a geometria dos pares",consolidar:"Consolidando e pré-classificando"};
+function evaluatePairs(jobs,info){
+  const total=jobs.length;
+  return new Promise((resolve,reject)=>{
+    const exec=++AN.exec;let done=false;
+    const finish=(fn,v)=>{if(done) return;done=true;AN.running=null;fn(v)};
+    const cancel=()=>{resetAnalysisWorker();progress.hide();finish(reject,{cancelado:true})};
+    AN.running={exec,cancel};
+    progress.show({title:"Análise de interferências",stage:STAGE_LABEL.pares,detail:`${info.pool} de ${info.elements} elementos entram na análise · ${total} pares candidatos`,onCancel:cancel});
+    if(!total){progress.hide();finish(resolve,[]);return}
+    const w=analysisWorker();
+    if(!w){ // sem Worker: mesma avaliação na linha principal, em lotes, com progresso e cancelamento
+      const out=new Array(total);let k=0;
+      const step=()=>{
+        if(done) return;
+        const t1=performance.now();
+        while(k<total&&performance.now()-t1<40){const j=jobs[k];
+          try{out[k]=GEOC.evaluatePair(solidOf(j.a),solidOf(j.b),{kind:j.t.kind,tol:j.tol,volume:false})}catch(e){out[k]={erro:String(e.message||e)}}k++}
+        progress.update({stage:STAGE_LABEL.avaliar,done:k,total,unit:"pares"});
+        if(k<total) setTimeout(step,0); else {progress.hide();finish(resolve,out)}
+      };
+      setTimeout(step,30);return;
+    }
+    // envia ao worker só as malhas que ele ainda não tem (Float64, a mesma geometria da análise)
+    const need=[],seen=new Set();
+    for(const j of jobs) for(const el of [j.a,j.b]) if(!AN.sent.has(el.idx)&&!seen.has(el.idx)){seen.add(el.idx);need.push(el)}
+    for(let i=0;i<need.length;i+=200){
+      const itens=need.slice(i,i+200).map(el=>({idx:el.idx,incomplete:el.geoIntegrity!=="completa",geoms:el.geoms.map(g=>({p64:g.p64,i:g.i}))}));
+      w.postMessage({tipo:"malhas",itens});for(const el of need.slice(i,i+200)) AN.sent.add(el.idx);
+    }
+    w.onmessage=ev=>{
+      const m=ev.data;if(m.execucao!==exec||done) return;
+      if(m.tipo==="progresso") progress.update({stage:STAGE_LABEL[m.etapa==="malhas"?"malhas":"avaliar"],done:m.feitos,total:m.total,unit:m.etapa==="malhas"?"elementos":"pares"});
+      else if(m.tipo==="resultado"){
+        for(const [idx,tp] of Object.entries(m.topologias||{})){const el=ELEMS[+idx];if(el&&tp) el._topo=tp}
+        progress.update({stage:STAGE_LABEL.consolidar,done:null,total:null});
+        setTimeout(()=>{progress.hide();finish(resolve,m.resultados)},0);
+      }
+      else if(m.tipo==="falha"){progress.hide();finish(reject,new Error(m.mensagem))}
+    };
+    w.onerror=ev=>{ev.preventDefault();const msg=ev.message||"erro no processamento em segundo plano";resetAnalysisWorker();progress.hide();
+      finish(reject,new Error(/memory|memória|allocation/i.test(msg)?"memória insuficiente para os modelos carregados":msg))};
+    w.postMessage({tipo:"avaliar",execucao:exec,pares:jobs.map(j=>({a:j.a.idx,b:j.b.idx,kind:j.t.kind,tol:j.tol}))});
+  });
+}
+/* painel de progresso (não bloqueia a interface); percentual só quando há contagem real */
+const progress={
+  el:null,
+  show({title,stage,detail,onCancel}){
+    if(!this.el){this.el=document.createElement("div");this.el.id="progressPanel";this.el.setAttribute("role","status");this.el.setAttribute("aria-live","polite");document.body.appendChild(this.el)}
+    this.el.innerHTML=`<div class="pg-head"><b>${esc(title)}</b><span class="pg-pct num"></span></div>
+      <div class="pg-bar indet"><i></i></div><div class="pg-stage"></div><div class="pg-detail muted"></div>
+      ${onCancel?'<button class="btn small" type="button" data-pg-cancel>Cancelar</button>':""}`;
+    this.el.hidden=false;this.onCancel=onCancel||null;
+    const b=this.el.querySelector("[data-pg-cancel]");if(b) b.onclick=()=>{b.disabled=true;b.textContent="Cancelando…";this.onCancel&&this.onCancel()};
+    this.update({stage,done:null,total:null});this.el.querySelector(".pg-detail").textContent=detail||"";
+  },
+  update({stage,done,total,unit}){
+    if(!this.el||this.el.hidden) return;
+    if(stage) this.el.querySelector(".pg-stage").textContent=stage;
+    const bar=this.el.querySelector(".pg-bar"),pct=this.el.querySelector(".pg-pct");
+    if(total>0&&done!=null){const f=Math.min(1,done/total);bar.classList.remove("indet");bar.firstElementChild.style.width=(f*100).toFixed(1)+"%";
+      pct.textContent=`${Math.floor(f*100)}%`;this.el.querySelector(".pg-detail").textContent=`${done.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")} ${unit||""}`.trim()}
+    else{bar.classList.add("indet");bar.firstElementChild.style.width="";pct.textContent=""}
+  },
+  detail(t){if(this.el) this.el.querySelector(".pg-detail").textContent=t||""},
+  hide(){if(this.el) this.el.hidden=true},
+};
 function topologyStats(pool){
   const st={solido_valido:0,aberta:0,invalida:0,superficie:0,vazia:0,nao_avaliado:0};
-  for(const e of pool){if(!e._solid){st.nao_avaliado++;continue}st[e._solid.topology]=(st[e._solid.topology]||0)+1}
+  for(const e of pool){const tp=e._solid?e._solid.topology:e._topo;if(!tp){st.nao_avaliado++;continue}st[tp]=(st[tp]||0)+1}
   return st;
 }
 function levelOrder(){
@@ -1277,7 +1505,7 @@ function renderNav(){
 }
 function go(view){DB.view=view;save();renderAll();$("#main").scrollTop=0}
 function renderAll(){
-  renderNav();
+  renderNav();renderProjFile();
   const v=DB.view, main=$("#main");
   // tira o visualizador antes de reescrever a área
   const viewer=$("#viewer");if(viewer.parentElement!==document.body){document.body.appendChild(viewer);viewer.hidden=true}
@@ -1344,8 +1572,9 @@ function viewModelos(){
     <div><h1>Modelos IFC</h1><p class="lede">Envie um arquivo por disciplina. A disciplina é lida do código no nome do arquivo (ex.: PROJ-<b>SAN</b>-R00.ifc) e pode ser ajustada.</p></div>
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="Enviar arquivos IFC">
       <div style="font-weight:600">Arraste arquivos .ifc aqui ou clique para selecionar</div>
-      <div class="muted" style="font-size:12.5px;margin-top:4px">Os arquivos são lidos no seu navegador. Neste protótipo eles não ficam salvos: ao reabrir a página, envie de novo.</div>
+      <div class="muted" style="font-size:12.5px;margin-top:4px">Importar modelos IFC não altera os arquivos originais. O projeto guarda a referência de cada IFC (nome, tamanho e assinatura) para reabri-los depois; o conteúdo dos IFCs não é copiado.</div>
     </div>
+    ${linkedPanel(P)}
     ${engineError?`<div class="alert"><div class="grow"><b>O motor IFC não carregou.</b> ${esc(engineError.message||engineError)}</div></div>`:""}
     <div class="panel">
       ${ms.length?`<div class="tbl-wrap"><table>
@@ -1468,8 +1697,8 @@ function viewRegras(){
     </div>
 
     <div class="panel">
-      <h2>Entidade (padrão Visus)</h2>
-      <p class="muted" style="font-size:12.5px;margin:0 0 10px">O campo <b>Entidade</b> mostra o nome em português da classe IFC, como no Visus Cost Management (IfcPipeSegment → Segmento de tubulação). Corrija aqui qualquer nome que esteja diferente do Visus.</p>
+      <h2>Entidade (padrão COORDIX)</h2>
+      <p class="muted" style="font-size:12.5px;margin:0 0 10px">O campo <b>Entidade</b> mostra o nome em português da classe IFC (IfcPipeSegment → Segmento de tubulação), no padrão de nomes do COORDIX. Ajuste aqui qualquer nome para o padrão adotado pela sua equipe.</p>
       <div class="tbl-wrap" style="max-height:340px;overflow:auto"><table><thead><tr><th>Classe IFC</th><th>Entidade exibida</th></tr></thead><tbody>
         ${[...new Set([...loadedClasses,...Object.keys(DEFAULT_ENTITY_NAMES)])].map(c=>`<tr><td class="mono">${esc(ifcPretty(c))}</td><td><input type="text" data-ent="${c}" value="${esc(entityName(c))}" aria-label="Entidade para ${esc(c)}"></td></tr>`).join("")}
       </tbody></table></div>
@@ -1757,11 +1986,15 @@ function viewBcf(){
 /* ===================================================================== */
 document.addEventListener("click",e=>{
   const t=e.target;
+  if(!t.closest("#projMenu")&&!t.closest("#projMenuBtn")) toggleProjMenu(false);
   const nav=t.closest("[data-nav]");if(nav){go(nav.dataset.nav);return}
   if(t.closest("#reviewPill")){go("revisao");return}
-  if(t.closest("[data-run]")){toast("Analisando a geometria dos modelos…");setTimeout(()=>{runAnalysis();if(DB.view==="revisao"){renderQueue();renderReviewCard(true)}},60);return}
-  if(t.closest("#newProjectBtn")){const p={id:uid(),name:"Novo projeto",desc:"",team:[{id:uid(),name:"",role:"Coordenador BIM",codes:"",email:"",coord:true}],...defaultSettings()};DB.projects.push(p);switchProject(p.id);go("projeto");setTimeout(()=>$("#pName")?.select(),30);return}
-  if(t.closest("#delProject")){const P=proj();if(t.dataset.confirm!=="1"){t.dataset.confirm="1";t.textContent="Confirmar exclusão";return}DB.projects=DB.projects.filter(p=>p!==P);switchProject(DB.projects[0].id);return}
+  if(t.closest("[data-run]")){runAnalysis().then(()=>{if(DB.view==="revisao"){renderQueue();renderReviewCard(true)}});return}
+  if(t.closest("#projMenuBtn")){toggleProjMenu();return}
+  const pact=t.closest("[data-pact]");if(pact){toggleProjMenu(false);PROJ_ACT[pact.dataset.pact]();return}
+  const lk=t.closest("[data-link]");if(lk){linkedAction(lk.dataset.link,+lk.dataset.i);return}
+  if(t.closest("#newProjectBtn")){toggleProjMenu(false);const p={id:uid(),name:"Novo projeto",desc:"",team:[{id:uid(),name:"",role:"Coordenador BIM",codes:"",email:"",coord:true}],...defaultSettings()};DB.projects.push(p);switchProject(p.id);go("projeto");setTimeout(()=>$("#pName")?.select(),30);return}
+  if(t.closest("#delProject")){excluirProjeto();return}
   if(t.closest("#addMember")){proj().team.push({id:uid(),name:"",role:"",codes:"",email:""});save();renderAll();return}
   const dm=t.closest("[data-del-member]");if(dm){const P=proj();P.team=P.team.filter(m=>m.id!==dm.dataset.delMember);save();renderAll();return}
   if(t.closest("#drop")){$("#fileInput").click();return}
@@ -1799,7 +2032,7 @@ document.addEventListener("change",e=>{
   if(t.id==="pName"){P.name=t.value.trim()||"Projeto sem nome";save();renderNav();return}
   if(t.id==="pDesc"){P.desc=t.value;save();return}
   const tr=t.closest("tr[data-mid]");if(tr){const m=P.team.find(x=>x.id===tr.dataset.mid);const f=t.dataset.f;if(f==="coord"){P.team.forEach(x=>x.coord=false);m.coord=true}else m[f]=t.value;save();reassignResp();return}
-  if(t.dataset.disc){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.disc);const code=t.value;m.code=code;m.disc=(CODE_INFO[code]||["A definir"])[0];m.group=(CODE_INFO[code]||[null,null])[1];for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}toast("Disciplina atualizada. Execute a análise de novo para aplicar.");return}
+  if(t.dataset.disc){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.disc);const code=t.value;m.code=code;{const r=(P.modelos||[]).find(x=>x.sha256===m.sha256&&x.arquivo===m.file);if(r) r.codigo=code}m.disc=(CODE_INFO[code]||["A definir"])[0];m.group=(CODE_INFO[code]||[null,null])[1];for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}toast("Disciplina atualizada. Execute a análise de novo para aplicar.");return}
   if(t.dataset.vis){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.vis);m.visible=t.checked;for(const c of m.chunks) c.visible=m.visible;V.dirty=true;return}
   const tt=t.closest("tr[data-test]");if(tt){const x=P.tests.find(y=>y.id===tt.dataset.test);const f=t.dataset.tf;x[f]=f==="on"?t.checked:f==="tol"?Math.max(0,+t.value||0):t.value;save();return}
   const ff=t.closest("[data-filter]");if(ff){const x=P.filters.find(y=>y.id===ff.dataset.filter);const f=t.dataset.ff;x[f]=f==="on"?t.checked:t.value;if(f==="kind"&&x.kind==="entity"&&!x.cls) x.cls=Object.keys(DEFAULT_ENTITY_NAMES)[0];save();if(f==="kind"||f==="op") renderAll();return}
@@ -1825,20 +2058,38 @@ document.addEventListener("keydown",e=>{if(e.target.id==="drop"&&(e.key==="Enter
 
 function reassignResp(){for(const c of currentClashes()){if(c.state!=="validado"){const r=responsible(c,proj());c.respSuggested=r.member;if(c.cls!=="FALSO") c.resp=r.member}}}
 async function handleFiles(files){
-  const P=proj();
-  for(const f of files){
-    if(!/\.ifc$/i.test(f.name)){toast(`${f.name} não é um arquivo .ifc.`);continue}
-    const buf=await f.arrayBuffer();
-    await loadIfc(P.id,f.name,buf);
+  const P=proj();files=[...files]; // cópia: o <input> é limpo logo após o evento e não pode esvaziar esta lista
+  const ifcs=files.filter(f=>/\.ifc$/i.test(f.name));
+  for(const f of files) if(!ifcs.includes(f)) toast(`${f.name} não é um arquivo .ifc.`);
+  for(let k=0;k<ifcs.length;k++){
+    const f=ifcs[k];
+    progress.show({title:"Leitura de modelos IFC",stage:"Carregando o arquivo",detail:`Arquivo ${k+1} de ${ifcs.length} · ${f.name} · ${fmtSize(f.size)}`});
+    const cam=window.coordixDesktop&&window.coordixDesktop.origemDoArquivo?window.coordixDesktop.origemDoArquivo(f):null;
+    await loadIfc(P.id,f.name,await f.arrayBuffer(),{caminho:cam}); // sem cópia retida aqui: o leitor libera o arquivo bruto após a abertura
   }
-  toast("Modelos lidos. Execute a análise em Clashes por nível.");
+  progress.hide();
+  if(ifcs.length) toast("Modelos lidos. Execute a análise em Clashes por nível.");
 }
+/* etapa da leitura do IFC: atualiza o painel e devolve o controle ao navegador para desenhá-lo
+   (cada etapa do leitor é uma operação única do web-ifc, sem contagem parcial: indicador indeterminado) */
+/* mensagens do leitor IFC em linguagem compreensível (o texto técnico original fica no console) */
+function ifcErrorText(e){
+  const t=String((e&&e.message)||e||"");
+  if(/Aborted|abort\(/i.test(t)) return "o leitor IFC interrompeu a leitura deste arquivo (estrutura não suportada ou memória do leitor esgotada). Tente abrir o arquivo sozinho num projeto novo; se persistir, envie o arquivo para análise";
+  if(/memory|allocation|out of bounds/i.test(t)) return "memória insuficiente no leitor IFC para este arquivo";
+  return t;
+}
+async function loadStage(t){progress.update({stage:t,done:null,total:null});await new Promise(r=>setTimeout(r,20))}
+function fmtSize(b){return b>=1048576?`${(b/1048576).toLocaleString("pt-BR",{maximumFractionDigits:1})} MB`:`${Math.max(1,Math.round(b/1024))} kB`}
 function removeModel(id){
   const P=proj();const list=S.models[P.id]||[];const m=list.find(x=>x.id===id);if(!m) return;
   for(const c of m.chunks){V.root.remove(c);c.geometry.dispose();c.material.dispose()}
-  for(const i of m.elems){ELEMS[i].geoms=[];ELEMS[i]._solid=null}
+  forgetAnalysisMeshes(m.elems);
+  unlinkModelRef(P,m); // remover do projeto ≠ apagar o arquivo: o IFC no disco nunca é tocado
+  for(const i of m.elems){ELEMS[i].geoms=[];ELEMS[i]._solid=null;ELEMS[i]._topo=null}
   try{if(m.mid!=null) api.CloseModel(m.mid)}catch(e){}
   S.models[P.id]=list.filter(x=>x!==m);
+  if(!S.models[P.id].length&&P.origemLocal){delete P.origemLocal;save()} // sem modelos: o próximo IFC define a nova origem do projeto
   S.clashes[P.id]=(S.clashes[P.id]||[]).filter(c=>ELEMS[c.a].model!==id&&ELEMS[c.b].model!==id);
   selectElements([],{silent:true});V.dirty=true;renderAll();
 }
@@ -1854,13 +2105,244 @@ function switchProject(id){
 const SAMPLES=["EXEMPLO-EST.ifc","EXEMPLO-ARQ.ifc","EXEMPLO-SAN.ifc","EXEMPLO-ELE.ifc","EXEMPLO-SCE.ifc","EXEMPLO-CLI.ifc"];
 async function loadSamples(){
   setStatus("Lendo modelos de exemplo…");
-  for(const f of SAMPLES){
+  for(let k=0;k<SAMPLES.length;k++){const f=SAMPLES[k];
+    progress.show({title:"Leitura de modelos IFC",stage:"Carregando o arquivo",detail:`Exemplo ${k+1} de ${SAMPLES.length} · ${f}`});
     try{const r=await fetch("./exemplos/"+f);if(!r.ok) throw new Error(r.status);const b=await r.arrayBuffer();await loadIfc("exemplo",f,b)}
     catch(e){console.error(e);toast(`Não foi possível ler ${f}.`)}
   }
+  progress.hide();
   setStatus("Clique em um elemento para ver as propriedades.");
   if(DB.current==="exemplo"){fitView();runAnalysis()} else S.pendingExampleRun=true;
 }
+/* =====================================================================
+   Projetos: Novo, Abrir, Salvar, Salvar como, Excluir (formato .coordix)
+   ---------------------------------------------------------------------
+   .coordix = JSON versionado: {formato:"coordix-projeto", versao, salvoEm, app, projeto, modelos, resultados}
+   - projeto: TODOS os dados do projeto (equipe, regras, filtros, nomes de Entidade, ordem de flexibilidade,
+     decisões do coordenador por par de GUIDs: classificação, responsável, comentários, histórico, snapshots,
+     issues e viewpoints, além do histórico de análises);
+   - modelos: REFERÊNCIAS aos IFCs (nome, disciplina, tamanho, SHA-256 e, no desktop, caminho absoluto e
+     relativo ao .coordix). Os IFCs não são copiados; ao reabrir, cada um é localizado e conferido pela assinatura;
+   - resultados: retrato da última análise (clashes por GUID e resumo), para conferência ao reabrir.
+   Ao reabrir com os IFCs disponíveis, a análise é refeita e as decisões salvas são reaplicadas pelos GUIDs.
+   ===================================================================== */
+const PROJ_FORMAT="coordix-projeto",PROJ_VERSION=1;
+const SAVED_SIG={}; // projeto → assinatura do conteúdo no último salvar/abrir (indicador "não salvo")
+async function sha256Hex(buf){
+  try{const h=await crypto.subtle.digest("SHA-256",buf instanceof ArrayBuffer?buf:buf.buffer);return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join("")}
+  catch(e){return null}
+}
+function sigOf(P){const t=JSON.stringify({...P,arquivo:undefined});let h=0;for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0;return h+":"+t.length}
+function linkModelRef(pid,m){
+  const P=DB.projects.find(p=>p.id===pid);if(!P||P.example) return;
+  P.modelos=P.modelos||[];
+  const ref={arquivo:m.file,codigo:m.code||"",tamanho:m.size,sha256:m.sha256||null,caminho:m.caminho||null,vinculadoEm:new Date().toISOString()};
+  const i=P.modelos.findIndex(r=>r.arquivo===m.file);
+  if(i>=0) P.modelos[i]={...P.modelos[i],...ref,vinculadoEm:P.modelos[i].vinculadoEm||ref.vinculadoEm}; else P.modelos.push(ref);
+  m.ref=ref.arquivo;save();
+}
+function unlinkModelRef(P,m){if(!P.modelos) return;P.modelos=P.modelos.filter(r=>r.arquivo!==m.file);save()}
+function cleanForFile(v,depth=0){ // cópia só com dados serializáveis (sem elementos 3D nem referências circulares)
+  if(v==null||typeof v!=="object") return typeof v==="function"?undefined:v;
+  if(depth>8) return undefined;
+  if(Array.isArray(v)) return v.map(x=>cleanForFile(x,depth+1));
+  if(v.isObject3D||v.isVector3||v.isBox3) return undefined;
+  const o={};for(const k in v){if(k==="el"||k==="m"||k==="geoms") continue;const x=cleanForFile(v[k],depth+1);if(x!==undefined) o[k]=x}return o;
+}
+function buildProjectFile(P){
+  const clashes=(S.clashes[P.id]||[]).map(c=>{const A=ELEMS[c.a],B=ELEMS[c.b];const o=cleanForFile({...c,a:undefined,b:undefined});
+    return {...o,guidA:A&&A.guid,guidB:B&&B.guid,arquivoA:A&&A.m.file,arquivoB:B&&B.m.file}});
+  const lr=S.lastRun[P.id];
+  const resumo=lr?cleanForFile({...lr,excluded:undefined,excluidos:(lr.excluded||[]).map(x=>({guid:x.el.guid,arquivo:x.el.m.file,motivo:x.why}))}):null;
+  const proj=cleanForFile(P);delete proj.arquivo;delete proj.modelos; // modelos vão na seção própria
+  return {formato:PROJ_FORMAT,versao:PROJ_VERSION,salvoEm:new Date().toISOString(),
+    app:{edicao:window.coordixDesktop?"desktop":"web",versaoWeb:WEB_VERSION},
+    projeto:proj,modelos:(P.modelos||[]).map(r=>({arquivo:r.arquivo,codigo:r.codigo,tamanho:r.tamanho,sha256:r.sha256,caminho:r.caminhoAtual||r.caminho||null,vinculadoEm:r.vinculadoEm})),
+    resultados:{ultimaAnalise:resumo,clashes}};
+}
+function parseProjectFile(text){
+  let o;try{o=JSON.parse(text)}catch(e){throw new Error("o arquivo de projeto está corrompido ou incompleto (JSON inválido)")}
+  if(!o||o.formato!==PROJ_FORMAT) throw new Error("este arquivo não é um projeto COORDIX (.coordix)");
+  if(!Number.isInteger(o.versao)||o.versao<1) throw new Error("versão do arquivo de projeto inválida");
+  if(o.versao>PROJ_VERSION) throw new Error(`o projeto foi salvo numa versão mais nova do COORDIX (formato ${o.versao}); atualize o aplicativo para abri-lo`);
+  if(!o.projeto||!o.projeto.id) throw new Error("o arquivo não contém os dados do projeto");
+  return o;
+}
+function completeProject(p){ // mesmos acréscimos aplicados aos projetos salvos no navegador
+  const d=defaultSettings();for(const k in d) if(p[k]===undefined) p[k]=d[k];
+  for(const t of DEFAULT_TESTS) if(!p.tests.some(x=>x.id===t.id)) p.tests.push({...t});
+  if(!p.flexOrder.includes("MET")){const i=p.flexOrder.indexOf("EST");p.flexOrder.splice(i<0?0:i+1,0,"MET")}
+  p.modelos=p.modelos||[];return p;
+}
+function confirmDialog({title,body,actions}){
+  const dlg=$("#confirmDlg");$("#confirmTitle").textContent=title;$("#confirmBody").innerHTML=body;
+  $("#confirmActions").innerHTML=actions.map((a,i)=>`<button class="btn ${a.kind||""}" type="button" data-i="${i}">${esc(a.label)}</button>`).join("");
+  return new Promise(res=>{
+    const done=v=>{dlg.close();res(v)};
+    $("#confirmActions").onclick=e=>{const b=e.target.closest("[data-i]");if(b) done(actions[+b.dataset.i].value)};
+    dlg.oncancel=e=>{e.preventDefault();done(null)};
+    dlg.showModal();const def=$("#confirmActions").querySelector(".btn:not(.danger)");def&&def.focus();
+  });
+}
+function toggleProjMenu(force){const m=$("#projMenu"),b=$("#projMenuBtn");const open=force===undefined?m.hidden:force;m.hidden=!open;b.setAttribute("aria-expanded",String(open));if(open) m.querySelector("button").focus()}
+function renderProjFile(){
+  const P=proj(),el=$("#projFile");if(!el) return;
+  if(P.example){el.hidden=true;return}
+  el.hidden=false;const nome=P.arquivo&&P.arquivo.nome;
+  el.textContent=nome||"não salvo em arquivo";el.title=P.arquivo&&P.arquivo.caminho||"Use Projeto → Salvar para gravar um arquivo .coordix";
+  el.classList.toggle("dirty",!!nome&&SAVED_SIG[P.id]!==undefined&&SAVED_SIG[P.id]!==sigOf(P));
+}
+async function salvarProjeto(comoNovo){
+  const P=proj();
+  if(P.example&&!comoNovo){const r=await confirmDialog({title:"Salvar projeto de exemplo",body:"<p>O projeto de exemplo é recriado a cada abertura. Para guardar este conteúdo, use <b>Salvar como</b>: será criado um arquivo .coordix com uma cópia dele.</p>",actions:[{label:"Cancelar",value:null},{label:"Salvar como…",value:1,kind:"primary"}]});if(!r) return;comoNovo=true}
+  const conteudo=buildProjectFile(P);
+  try{
+    if(window.coordixDesktop&&window.coordixDesktop.projeto){
+      const r=await window.coordixDesktop.projeto.salvar({conteudo,caminho:P.arquivo&&P.arquivo.caminho,comoNovo:!!comoNovo,nomeSugerido:P.name});
+      if(!r) return;
+      P.arquivo={caminho:r.caminho,nome:r.nome,salvoEm:r.salvoEm};
+    }else{ // navegador: o arquivo é baixado (o navegador não grava em pastas escolhidas pela página)
+      const nome=String(P.name||"Projeto").replace(/[\\/:*?"<>|]+/g,"-").slice(0,120)+".coordix";
+      const url=URL.createObjectURL(new Blob([JSON.stringify(conteudo,null,1)],{type:"application/json"}));
+      const a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
+      P.arquivo={nome,salvoEm:new Date().toISOString()};
+    }
+    SAVED_SIG[P.id]=sigOf(P);save();renderProjFile();
+    toast(`Projeto salvo em ${P.arquivo.nome}.`);
+  }catch(e){console.error(e);toast(`Não foi possível salvar o projeto: ${e.message||e}`)}
+}
+async function abrirProjeto(){
+  try{
+    let texto,info=null;
+    if(window.coordixDesktop&&window.coordixDesktop.projeto){info=await window.coordixDesktop.projeto.abrir();if(!info) return;texto=info.conteudo}
+    else{const f=await pickFile($("#projInput"));if(!f) return;texto=await f.text();info={nome:f.name,caminho:null,ifcs:null}}
+    const o=parseProjectFile(texto);
+    let p=completeProject(o.projeto);
+    const existente=DB.projects.find(x=>x.id===p.id);
+    if(existente){
+      const r=await confirmDialog({title:"Projeto já existe no COORDIX",
+        body:`<p>O projeto <b>${esc(p.name)}</b> já está no COORDIX. Substituir pelo conteúdo do arquivo (salvo em ${esc(dateBR(o.salvoEm))}) ou abrir como uma cópia separada?</p><p class="muted" style="margin-top:8px">Substituir troca equipe, regras e decisões pelas do arquivo. Nenhum IFC é alterado.</p>`,
+        actions:[{label:"Cancelar",value:null},{label:"Abrir como cópia",value:"copia"},{label:"Substituir",value:"substituir",kind:"primary"}]});
+      if(!r) return;
+      if(r==="copia"){p={...p,id:uid(),name:p.name+" (cópia)"}}
+      else{for(const m of [...(S.models[existente.id]||[])]){DB.current=existente.id;removeModel(m.id)}DB.projects=DB.projects.filter(x=>x!==existente);delete S.clashes[existente.id];delete S.lastRun[existente.id]}
+    }
+    p.arquivo=info.caminho?{caminho:info.caminho,nome:info.nome,salvoEm:o.salvoEm}:{nome:info.nome,salvoEm:o.salvoEm};
+    // situação dos IFCs: no desktop, conferida no disco; no navegador, o usuário seleciona os arquivos
+    const sit=info.ifcs||[];
+    p.modelos=(o.modelos||[]).map((r,i)=>({...r,situacao:sit[i]?sit[i].situacao:"selecionar",caminhoAtual:sit[i]&&sit[i].caminho||null,shaAtual:sit[i]&&sit[i].sha256||null}));
+    S.savedResult=S.savedResult||{};S.savedResult[p.id]=o.resultados||null;
+    DB.projects.push(p);switchProject(p.id);SAVED_SIG[p.id]=sigOf(p);go("modelos");renderProjFile();
+    const ok=p.modelos.filter(r=>r.situacao==="encontrado");
+    toast(`Projeto ${p.name} aberto.${p.modelos.length?` ${ok.length} de ${p.modelos.length} IFCs encontrados.`:""}`);
+    if(ok.length) await carregarVinculados(p,ok);
+  }catch(e){console.error(e);toast(`Não foi possível abrir o projeto: ${e.message||e}`)}
+}
+function pickFile(input,multi){return new Promise(res=>{input.value="";input.onchange=()=>res(multi?[...input.files]:input.files[0]||null);input.click()})}
+async function carregarVinculados(P,refs){
+  if(!refs.length) return;
+  let n=0;
+  for(let k=0;k<refs.length;k++){const r=refs[k];
+    if((S.models[P.id]||[]).some(m=>m.file===r.arquivo&&m.status!=="erro")) continue;
+    progress.show({title:"Reabrindo modelos do projeto",stage:"Lendo o arquivo do disco",detail:`Modelo ${k+1} de ${refs.length} · ${r.arquivo}`});
+    try{const f=await window.coordixDesktop.ifc.ler(r.caminhoAtual||r.caminho);
+      await loadIfc(P.id,r.arquivo,f.bytes.buffer.slice(f.bytes.byteOffset,f.bytes.byteOffset+f.bytes.byteLength),{caminho:f.caminho,sha256:f.sha256});
+      const m=(S.models[P.id]||[]).find(x=>x.file===r.arquivo);if(m&&r.codigo&&m.code!==r.codigo) setModelCode(P,m,r.codigo);
+      r.situacao="carregado";n++}
+    catch(e){console.error(e);r.situacao="ausente";toast(`Não foi possível reabrir ${r.arquivo}: ${e.message||e}`)}
+  }
+  progress.hide();save();renderAll();
+  if(n) await reanalisarComDecisoes(P);
+}
+function setModelCode(P,m,code){m.code=code;m.disc=(CODE_INFO[code]||["A definir"])[0];m.group=(CODE_INFO[code]||[null,null])[1];for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}}
+async function reanalisarComDecisoes(P){
+  if(DB.current!==P.id) return;
+  await runAnalysis(); // as decisões salvas (por par de GUIDs) são reaplicadas pela própria análise
+  const sv=S.savedResult&&S.savedResult[P.id];
+  if(sv&&sv.clashes){const agora=(S.clashes[P.id]||[]).length,antes=sv.clashes.length;
+    if(agora!==antes) toast(`Atenção: a análise atual tem ${agora} clashes e o projeto salvo tinha ${antes}. Verifique se os IFCs ou as regras mudaram.`)}
+}
+function linkedPanel(P){
+  if(P.example||!(P.modelos||[]).length) return "";
+  const loaded=new Set((S.models[P.id]||[]).filter(m=>m.status!=="erro").map(m=>m.file));
+  const pend=P.modelos.map((r,i)=>({r,i})).filter(x=>!loaded.has(x.r.arquivo));
+  if(!pend.length) return "";
+  const desk=!!(window.coordixDesktop&&window.coordixDesktop.ifc);
+  const label={encontrado:"encontrado no disco",alterado:"encontrado, mas o arquivo mudou desde que foi vinculado",ausente:"não encontrado",selecionar:"selecione o arquivo",carregado:"carregado"};
+  return `<div class="panel stack"><h2>Modelos vinculados ao projeto</h2>
+    <p class="muted" style="margin:0">Este projeto referencia ${P.modelos.length} IFC${P.modelos.length>1?"s":""}; ${pend.length} ainda não ${pend.length>1?"foram carregados":"foi carregado"} nesta sessão. Os arquivos originais não são copiados nem alterados.</p>
+    <div class="linked">${pend.map(({r,i})=>`<div class="lk"><span class="nm">${esc(r.arquivo)}</span>
+      <span class="chip ${r.situacao==="encontrado"?"ok":r.situacao==="alterado"?"geo":"outline"}">${esc(label[r.situacao]||(desk&&r.caminho?"vinculado":"selecione o arquivo"))}</span>
+      <span class="grow muted mono" title="${esc(r.caminhoAtual||r.caminho||"")}">${esc(r.caminhoAtual||r.caminho||"")}</span>
+      ${desk&&(r.caminhoAtual||r.caminho)&&r.situacao!=="ausente"?`<button class="btn small" data-link="carregar" data-i="${i}">${r.situacao==="alterado"?"Carregar mesmo assim":"Carregar"}</button>`:""}
+      <button class="btn small" data-link="localizar" data-i="${i}">Localizar…</button>
+      <button class="btn small ghost" data-link="esquecer" data-i="${i}">Desvincular</button></div>`).join("")}</div>
+    ${pend.length>1&&desk?`<div><button class="btn small primary" data-link="todos" data-i="0">Carregar todos os encontrados</button></div>`:""}</div>`;
+}
+async function linkedAction(act,i){
+  const P=proj();const r=P.modelos[i];if(!r&&act!=="todos") return;
+  const desk=!!(window.coordixDesktop&&window.coordixDesktop.ifc);
+  if(act==="esquecer"){P.modelos.splice(i,1);save();renderAll();return}
+  if(act==="todos"){await carregarVinculados(P,P.modelos.filter(x=>x.situacao!=="ausente"&&(x.caminhoAtual||x.caminho)));return}
+  if(act==="carregar"){await carregarVinculados(P,[r]);return}
+  if(act==="localizar"){
+    let f,meta=null;
+    if(desk){const x=await window.coordixDesktop.ifc.localizar(r.arquivo);if(!x) return;
+      f={name:x.nome,bytes:x.bytes.buffer.slice(x.bytes.byteOffset,x.bytes.byteOffset+x.bytes.byteLength)};meta={caminho:x.caminho,sha256:x.sha256}}
+    else{const fl=await pickFile($("#relinkInput"));if(!fl) return;f={name:fl.name,bytes:await fl.arrayBuffer()};meta={caminho:null,sha256:await sha256Hex(f.bytes)}}
+    if(r.sha256&&meta.sha256&&r.sha256!==meta.sha256){
+      const ok=await confirmDialog({title:"Arquivo diferente do vinculado",body:`<p>O arquivo escolhido (<b>${esc(f.name)}</b>) não é idêntico ao IFC salvo no projeto (<b>${esc(r.arquivo)}</b>): a assinatura é diferente. Pode ser uma revisão do modelo.</p><p class="muted" style="margin-top:8px">Se usar este arquivo, a análise será refeita com ele e o vínculo passa a apontar para ele.</p>`,
+        actions:[{label:"Cancelar",value:null},{label:"Usar este arquivo",value:1,kind:"primary"}]});
+      if(!ok) return;
+    }
+    P.modelos.splice(i,1);save();
+    await loadIfc(P.id,f.name,f.bytes,meta);
+    const m=(S.models[P.id]||[]).find(x=>x.file===f.name);if(m&&r.codigo&&m.code!==r.codigo) setModelCode(P,m,r.codigo);
+    renderAll();await reanalisarComDecisoes(P);
+  }
+}
+async function excluirProjeto(){
+  const P=proj();
+  if(P.example){toast("O projeto de exemplo não pode ser excluído.");return}
+  const ms=(S.models[P.id]||[]).length,refs=(P.modelos||[]).length,iss=Object.values(P.decisions||{}).filter(d=>d.issueIndex!=null).length;
+  const ok=await confirmDialog({title:"Excluir projeto",
+    body:`<p>Excluir o projeto <b>${esc(P.name)}</b> do COORDIX?</p>
+      <p class="muted" style="margin-top:8px">Serão removidos equipe, regras, decisões de revisão${iss?`, ${iss} issue${iss>1?"s":""}`:""} e resultados deste projeto${ms?`, e os ${ms} modelo${ms>1?"s":""} abertos nesta sessão serão fechados`:""}.</p>
+      <p style="margin-top:8px"><b>Os arquivos no seu computador não são apagados</b>: nem os IFCs originais${refs?` (${refs} vinculado${refs>1?"s":""})`:""}${P.arquivo&&P.arquivo.nome?`, nem o arquivo ${esc(P.arquivo.nome)}`:""}.</p>`,
+    actions:[{label:"Cancelar",value:null},{label:"Excluir projeto",value:1,kind:"danger"}]});
+  if(!ok) return;
+  for(const m of [...(S.models[P.id]||[])]) removeModel(m.id);
+  delete S.models[P.id];delete S.clashes[P.id];delete S.lastRun[P.id];delete SAVED_SIG[P.id];
+  DB.projects=DB.projects.filter(p=>p!==P);
+  switchProject((DB.projects.find(p=>!p.example)||DB.projects[0]).id);go("projeto");
+  toast(`Projeto ${P.name} excluído. Nenhum arquivo do computador foi apagado.`);
+}
+const PROJ_ACT={
+  abrir:abrirProjeto,salvar:()=>salvarProjeto(false),salvarComo:()=>salvarProjeto(true),excluir:excluirProjeto,
+  importarIfc:()=>{go("modelos");setTimeout(()=>$("#drop")?.click(),50)},
+};
+document.addEventListener("keydown",e=>{
+  if(!(e.ctrlKey||e.metaKey)||e.altKey) return;
+  const k=e.key.toLowerCase();
+  if(k==="s"){e.preventDefault();salvarProjeto(e.shiftKey)}
+  else if(k==="o"&&!e.shiftKey){e.preventDefault();abrirProjeto()}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#projMenu").hidden){toggleProjMenu(false);$("#projMenuBtn").focus()}});
+
+/* ---------- sobre o COORDIX ---------- */
+const WEB_VERSION="2.4"; // versão da interface web (main); o desktop informa a própria versão
+async function openAbout(){
+  let rows=[["Edição","COORDIX Web"],["Versão",WEB_VERSION]];
+  if(window.coordixDesktop&&window.coordixDesktop.info){
+    try{const i=await window.coordixDesktop.info();rows=[["Edição","COORDIX Desktop (Windows)"],["Versão",`${i.versao} · ${i.rotulo}`]]}catch(e){}
+  }
+  rows.push(["Desenvolvido por","Eng. Brunno Resplandes"],["Núcleo geométrico","coordix-geometria.js · precisão dupla · BVH"],["Leitor IFC",`web-ifc ${WEBIFC_VERSION}`],["Visualizador","three.js r147"],["Análise","em segundo plano (Web Worker)"]);
+  $("#aboutKv").innerHTML=rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+  $("#aboutDlg").showModal();
+}
+document.getElementById("aboutBtn").addEventListener("click",openAbout);
+document.getElementById("aboutDlg").addEventListener("click",e=>{if(e.target.closest("[data-about-close]")||e.target.id==="aboutDlg") e.currentTarget.close()});
+
 /* ---------- tema claro/escuro (só apresentação; preferência em localStorage["coordix.tema"]) ---------- */
 const THEME_KEY="coordix.tema";
 const sysDark=matchMedia("(prefers-color-scheme: dark)");

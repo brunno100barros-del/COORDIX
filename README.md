@@ -7,7 +7,7 @@ A automação faz a parte repetitiva e o coordenador BIM continua responsável p
 
 <p><img src="marca/coordix-icone.svg" width="72" alt="Símbolo do COORDIX"></p>
 
-> **Status:** protótipo funcional, versão **2.3** (veja o [histórico de versões](#histórico-de-versões)). Roda inteiro no navegador. Os modelos IFC não ficam salvos entre sessões. O backend em Python está planejado (veja o roteiro abaixo).
+> **Status:** protótipo funcional, versão **2.4** (veja o [histórico de versões](#histórico-de-versões)). Roda inteiro no navegador. Os modelos IFC não ficam salvos entre sessões: o projeto pode ser salvo em arquivo `.coordix`, que guarda as referências dos IFCs e os resultados. O backend em Python está planejado (veja o roteiro abaixo).
 
 ## Versões web e desktop
 
@@ -19,11 +19,13 @@ A automação faz a parte repetitiva e o coordenador BIM continua responsável p
 | Módulo | Recursos |
 |---|---|
 | Projeto e equipe | Projetos separados, integrantes com cargo, códigos de disciplina e e-mail, indicação do coordenador |
-| Modelos IFC | Upload por arrastar e soltar, disciplina detectada pelo código no nome do arquivo (EST, ARQ, SAN, ELE, SCE, PCI, CLI…), esquema IFC e entidades ignoradas na leitura |
+| Projetos em arquivo | Salvar, salvar como e abrir projetos `.coordix` (equipe, regras, decisões e resultados), com as referências dos IFCs verificadas por assinatura SHA-256 ao reabrir; exclusão com confirmação, sem apagar nenhum arquivo |
+| Modelos IFC | Upload por arrastar e soltar, disciplina detectada pelo código no nome do arquivo (EST, MET, ARQ, SAN, ELE, SCE, PCI, CLI…), leitura de IFC2X3, IFC4 e IFC4X3 (web-ifc 0.0.78), progresso por arquivo e por etapa, esquema IFC e entidades ignoradas na leitura |
+| Coordenadas | Modelos georreferenciados (UTM) exibidos sem distorção: origem local por projeto e desenho relativo ao centro de cada malha, mantendo a posição relativa entre os IFCs; alerta quando um modelo está em outro sistema de coordenadas |
 | Visualizador | 3D com árvore modelo → pavimento → entidade, isolar, aproximar e snapshot |
-| Propriedades | Aba **Geral** no padrão Visus (Disciplina, **Entidade**, ID IFC, Layer, Pavimento, Type) e aba **PropertySets** com quantitativos e propriedades do tipo |
-| Regras de análise | Matriz de tolerância com os 21 testes do manual corporativo (interferência ou folga, em mm), filtros de exclusão por entidade ou PropertySet, ordem de flexibilidade das disciplinas e tabela de nomes de Entidade editável |
-| Clash detection | Núcleo geométrico próprio (`coordix-geometria.js`): classificação topológica das malhas (sólido válido, aberta, inválida), espessura de interferência rigorosa (exata para peças convexas) ou estimada quando a malha não é sólida, volume de interseção, folga por distância exata, integridade geométrica por elemento, índice espacial (BVH) em cada malha, unidade declarada no IFC e estados de confiabilidade (confirmado, abaixo da tolerância, contato, sem conflito, inconclusivo e incompleto) |
+| Propriedades | Aba **Geral** no padrão COORDIX (Disciplina, **Entidade**, ID IFC, Layer, Pavimento, Type) e aba **PropertySets** com quantitativos e propriedades do tipo |
+| Regras de análise | Matriz de tolerância com os 21 testes do manual corporativo e 7 testes próprios para Estrutura Metálica (MET) (interferência ou folga, em mm), filtros de exclusão por entidade ou PropertySet, ordem de flexibilidade das disciplinas e tabela de nomes de Entidade editável |
+| Clash detection | Núcleo geométrico próprio (`coordix-geometria.js`): classificação topológica das malhas (sólido válido, aberta, inválida), análise em segundo plano (Web Worker) com progresso real e cancelamento, espessura de interferência rigorosa (exata para peças convexas) ou estimada quando a malha não é sólida, volume de interseção, folga por distância exata, integridade geométrica por elemento, índice espacial (BVH) em cada malha, unidade declarada no IFC e estados de confiabilidade (confirmado, abaixo da tolerância, contato, sem conflito, inconclusivo e incompleto) |
 | Clashes por nível | Resultados agrupados por pavimento, aba separada de **falsos clashes** e alerta de revisão pendente |
 | Pré-classificação | Regras P1, P2, P3, P4, INFO e Falso clash com o motivo exibido, além do responsável sugerido pela disciplina que se adapta |
 | Revisão | Fila um por um, câmera no conflito (A em vermelho, B em azul), PropertySets dos dois elementos, alteração de classificação e responsável, comentários, snapshot e histórico. Atalhos: `Enter`, `F`, `1`–`5`, `←` `→` |
@@ -75,6 +77,17 @@ Primeiro protótipo, publicado como BIMORA.
 - Todas as funcionalidades preservadas; núcleo geométrico sem alteração.
 - Relatório: `docs/redesign-industrial-precision.md`.
 
+### v2.4 · Melhorias validadas na versão desktop (08/11/2026)
+Recursos desenvolvidos e testados primeiro na versão desktop (0.2.0 a 0.4.0) e trazidos para a web após aprovação.
+- **Análise em segundo plano:** os pares são avaliados num Web Worker, com painel de progresso real e botão de cancelar; a interface não trava. Mesmos resultados da análise anterior (lista de clashes idêntica).
+- **Projetos em arquivo `.coordix`:** salvar, salvar como e abrir; o arquivo guarda equipe, regras, decisões e resultados, e referencia os IFCs (nome, tamanho e SHA-256) sem copiá-los. No navegador, o projeto é baixado como arquivo e reaberto pelo menu Projeto. Exclusão de projeto com confirmação.
+- **Estrutura Metálica (MET):** nova disciplina, com 7 testes próprios na matriz.
+- **Leitor IFC atualizado (web-ifc 0.0.78):** lê IFC4X3, gera geometria mais fiel em modelos do Revit (sem "estilhaços"), círculos com 24 segmentos e mensagens de erro do leitor em português. Comparado ao leitor anterior em 12 arquivos, sem perda de elementos.
+- **Coordenadas georreferenciadas:** cada projeto tem a própria origem local e as malhas são desenhadas relativas ao próprio centro, o que elimina a distorção de modelos a milhares de km da origem. A posição relativa entre os IFCs e os viewpoints do BCF (em coordenadas do IFC) são preservados. Modelos em outro sistema de coordenadas recebem um alerta.
+- **Leitura:** progresso por arquivo e por etapa; vários arquivos lidos em sequência; arquivo bruto liberado após a abertura.
+- Tela "Sobre o COORDIX" e textos da interface sem referência ao Visus.
+- Núcleo geométrico sem alteração. Relatório dos testes: `docs/desktop-electron.md` (branch `desktop-electron`).
+
 ## Como rodar
 
 O app é estático: basta servir a pasta por HTTP. Abrir o `index.html` direto do disco não funciona, porque o navegador bloqueia o carregamento do `.wasm`.
@@ -93,9 +106,12 @@ Na primeira abertura é carregado um projeto de exemplo, com modelos fictícios 
 ```
 index.html                       app (interface, leitura IFC, análise, revisão, BCF)
 coordix-geometria.js             núcleo geométrico (sem dependências; navegador e Node)
-web-ifc.wasm                     motor de leitura IFC (web-ifc 0.0.39)
+coordix-analise-worker.js        análise de pares em segundo plano (Web Worker com o núcleo geométrico)
+web-ifc.wasm                     cópia antiga do leitor (0.0.39); o app carrega o leitor 0.0.78 por CDN
 exemplos/                        IFCs fictícios com conflitos planejados
 ferramentas/gerar_ifc_exemplo.py gera os IFCs de exemplo
+ferramentas/gerar_ifc_carga.py   gera os IFCs de carga (pequeno, médio e grande) para medir leitura e análise
+testes/ifc-carga/                IFCs de carga gerados
 ferramentas/gerar_simbolo.py     gera o símbolo do COORDIX (SVG)
 marca/                           símbolo, versão com sobrancelha e ícone do aplicativo
 testes/geometria.test.js         suíte de testes geométricos (101 cenários)
@@ -122,12 +138,12 @@ node testes/bvh.test.js          # equivalência da BVH com o núcleo linear (~1
 node testes/desempenho_bvh.js    # tempos medidos na sua máquina
 ```
 
-Bibliotecas carregadas por CDN: three.js 0.147 e web-ifc 0.0.39.
+Bibliotecas carregadas por CDN: three.js 0.147 e web-ifc 0.0.78.
 
 ## Roteiro
 
 1. Backend em Python (FastAPI + IfcOpenShell) com banco PostgreSQL, armazenamento dos IFCs e das versões, e login por papel.
-2. Fase 02: ~~BVH por elemento (Marco 1)~~ concluído; índice espacial entre elementos (Marco 2), análise em segundo plano com Web Worker (Marco 3), decomposição convexa (Marco 4) e junções em T (Marco 5).
+2. Fase 02: ~~BVH por elemento (Marco 1)~~ concluído; índice espacial entre elementos (Marco 2), ~~análise em segundo plano com Web Worker (Marco 3)~~ concluído, decomposição convexa (Marco 4) e junções em T (Marco 5).
 3. Atribuição de pavimento pela cota para modelos sem pavimentos reais (por exemplo, estrutura metálica em "Default Storey").
 4. Geração do arquivo BCF 2.1 e validação da importação no Trimble Connect.
 5. Revisão dos nomes de Entidade conforme o Visus.
