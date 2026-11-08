@@ -15,7 +15,7 @@ const RAIZ = path.resolve(__dirname, "..", "..");
 const NM = path.join(RAIZ, "node_modules");
 const DEST = path.join(RAIZ, "desktop", "vendor");
 
-const VERSOES = { three: "0.147.0", "web-ifc": "0.0.39" }; // as mesmas URLs do index.html
+const VERSOES = { three: "0.147.0", "web-ifc": "0.0.78" }; // as mesmas URLs do index.html
 const erros = [];
 
 function versaoDe(pacote) {
@@ -39,12 +39,12 @@ for (const [p, v] of Object.entries(VERSOES)) {
 copiar(path.join(NM, "three/build/three.min.js"), path.join(DEST, "three/build/three.min.js"));
 copiar(path.join(NM, "three/examples/js/controls/OrbitControls.js"), path.join(DEST, "three/examples/js/controls/OrbitControls.js"));
 
-// web-ifc 0.0.39: API ESM e arquivos do pacote (o .wasm usado continua sendo o web-ifc.wasm da raiz do projeto)
+// web-ifc 0.0.78: API ESM e .wasm da mesma versão (o app busca os dois na URL do CDN, servida por esta cópia)
 const wi = path.join(NM, "web-ifc");
 if (fs.existsSync(wi)) {
   for (const f of fs.readdirSync(wi)) if (/\.(m?js|wasm)$/.test(f)) copiar(path.join(wi, f), path.join(DEST, "web-ifc", f));
 }
-if (!fs.existsSync(path.join(DEST, "web-ifc/web-ifc-api.js"))) erros.push("ausente: web-ifc/web-ifc-api.js");
+for (const f of ["web-ifc-api.js", "web-ifc.wasm"]) if (!fs.existsSync(path.join(DEST, "web-ifc", f))) erros.push("ausente: web-ifc/" + f);
 
 // fontes IBM Plex (mesmas famílias e pesos do link do Google Fonts no index.html)
 const FONTES = [

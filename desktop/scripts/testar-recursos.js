@@ -13,7 +13,9 @@ const casos = [
   ["coordix://app/marca/coordix-icone.svg", "marca/coordix-icone.svg"],
   ["https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js", "desktop/vendor/three/build/three.min.js"],
   ["https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js", "desktop/vendor/three/examples/js/controls/OrbitControls.js"],
-  ["https://cdn.jsdelivr.net/npm/web-ifc@0.0.39/web-ifc-api.js", "desktop/vendor/web-ifc/web-ifc-api.js"],
+  ["https://cdn.jsdelivr.net/npm/web-ifc@0.0.78/web-ifc-api.js", "desktop/vendor/web-ifc/web-ifc-api.js"],
+  ["https://cdn.jsdelivr.net/npm/web-ifc@0.0.78/web-ifc.wasm", "desktop/vendor/web-ifc/web-ifc.wasm"],
+  ["https://cdn.jsdelivr.net/npm/web-ifc@0.0.39/web-ifc-api.js", null],
   ["https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap", "desktop/vendor/fonts/fonts.css"],
   ["https://fonts.gstatic.com/coordix/ibm-plex-mono-latin-400-normal.woff2", "desktop/vendor/fonts/ibm-plex-mono-latin-400-normal.woff2"],
   // recusados

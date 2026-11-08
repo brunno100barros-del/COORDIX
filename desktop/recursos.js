@@ -27,7 +27,7 @@ const PERMITIDOS = [
 /* URLs externas usadas pelo index.html → cópia local (mesma versão) */
 const CDN = [
   { prefixo: "https://cdn.jsdelivr.net/npm/three@0.147.0/", local: "desktop/vendor/three/" },
-  { prefixo: "https://cdn.jsdelivr.net/npm/web-ifc@0.0.39/", local: "desktop/vendor/web-ifc/" },
+  { prefixo: "https://cdn.jsdelivr.net/npm/web-ifc@0.0.78/", local: "desktop/vendor/web-ifc/" },
   { prefixo: "https://fonts.gstatic.com/coordix/", local: "desktop/vendor/fonts/" },
 ];
 

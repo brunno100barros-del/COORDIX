@@ -726,18 +726,23 @@ function coordinator(){return proj().team.find(m=>m.coord)||proj().team[0]||{nam
 /*  Motor IFC (web-ifc) e visualizador (three.js)                         */
 /* ===================================================================== */
 let WEBIFC=null, api=null, engineError=null;
+const WEBIFC_VERSION="0.0.78", WEBIFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEBIFC_VERSION}/`;
+// círculos com 24 segmentos (padrão do leitor: 12). Polígono inscrito: com 12 lados um tubo Ø100 perde até
+// 1,7 mm de raio; com 24, 0,4 mm — mais fiel na análise e no desenho de tubos, conexões e chumbadores
+const IFC_LOADER_SETTINGS={COORDINATE_TO_ORIGIN:false,CIRCLE_SEGMENTS:24};
 const TYPE_NAME={};
 const vec=v=>{if(!v) return []; if(Array.isArray(v)) return v; const out=[];const n=v.size();for(let i=0;i<n;i++) out.push(v.get(i));return out};
 const val=a=>a==null?null:(typeof a==="object"&&"value" in a)?a.value:a;
 
 async function initEngine(){
   try{
-    WEBIFC = await import("https://cdn.jsdelivr.net/npm/web-ifc@0.0.39/web-ifc-api.js");
-    for(const [k,v] of Object.entries(WEBIFC)) if(/^IFC[A-Z0-9]+$/.test(k)&&typeof v==="number") TYPE_NAME[v]=k;
+    // leitor IFC: web-ifc 0.0.78 (lê IFC2X3, IFC4 e IFC4X3; geometria de curvas, varreduras e conexões
+    // muito mais robusta que a 0.0.39). API e .wasm da MESMA versão; no desktop, servidos por cópia local.
+    WEBIFC = await import(`${WEBIFC_BASE}web-ifc-api.js`);
+    for(const [k,v] of Object.entries(WEBIFC)) if(/^IFC[A-Z0-9_]+$/.test(k)&&typeof v==="number") TYPE_NAME[v]=k;
     api = new WEBIFC.IfcAPI();
-    const base = new URL("./", location.href).href;
-    try{api.SetWasmPath(base,true)}catch(e){api.SetWasmPath(base)}
-    await api.Init((path)=> path.endsWith(".wasm") ? base+"web-ifc.wasm" : path);
+    api.SetWasmPath(WEBIFC_BASE,true);
+    await api.Init((path)=> path.endsWith(".wasm") ? WEBIFC_BASE+"web-ifc.wasm" : path, true);
     setStatus("Motor IFC pronto.");
   }catch(e){
     engineError=e; console.error(e);
@@ -819,7 +824,8 @@ async function loadIfc(projectId, file, bytes, origem){
     try{const head=new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4000,bytes.byteLength)));const mm=head.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i);m.schema=mm?mm[1]:""}catch(e){}
     m.stage="abertura do arquivo";
     await loadStage(`Abrindo ${file} (leitura do IFC)`);
-    const mid=api.OpenModel(new Uint8Array(bytes),{COORDINATE_TO_ORIGIN:false,USE_FAST_BOOLS:true});
+    const mid=api.OpenModel(new Uint8Array(bytes),IFC_LOADER_SETTINGS);
+    if(mid<0) throw new Error("o leitor IFC não conseguiu abrir o arquivo");
     m.mid=mid;
     await loadStage("Lendo pavimentos, PropertySets, tipos e sistemas");
     indexModel(m);
@@ -833,8 +839,8 @@ async function loadIfc(projectId, file, bytes, origem){
     renderAll();
     if(projectId===DB.current && list.filter(x=>x.status==="pronto").length===1) fitView();
     linkModelRef(projectId,m);
-  }catch(e){console.error(e);m.status="erro";m.error=`${e.message||e} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll();
-    toast(`Não foi possível ler ${file}: ${/memory|allocation/i.test(String(e.message||e))?"memória insuficiente para este arquivo":m.error}`)}
+  }catch(e){console.error(e);m.status="erro";m.error=`${ifcErrorText(e)} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll();
+    toast(`Não foi possível ler ${file}: ${m.error}`)}
   return m;
 }
 
@@ -957,7 +963,7 @@ function buildGeometry(m){
   m.unitScale=s;m.unitInfo=Object.assign({},us,{readerConverts,check:det});m.rawOrigin=origin;m.geoFlags=m.geoFlags||[];m.lengthScale=us.declaredScale||1;
   if(us.status!=="declarada"){m.unitUnsupported=true;m.geoFlags.push(us.status==="ausente"?"O arquivo não declara unidade de comprimento: resultados geométricos marcados como inconclusivos":us.status==="ambigua"?`Unidades de comprimento conflitantes (${us.label}): resultados geométricos marcados como inconclusivos`:`Unidade de comprimento não suportada (${us.label}): resultados geométricos marcados como inconclusivos`)}
   else{
-    if(det.converts===null&&Math.abs((lu.scale||1)-1)>1e-12) m.geoFlags.push(`Conversão de unidade pelo leitor assumida (comportamento do web-ifc 0.0.39); não foi possível verificá-la neste arquivo`);
+    if(det.converts===null&&Math.abs((lu.scale||1)-1)>1e-12) m.geoFlags.push(`Conversão de unidade pelo leitor assumida (comportamento do leitor IFC); não foi possível verificá-la neste arquivo`);
     const pl=GEOC.checkScalePlausibility(ext*s);
     if(!pl.ok){m.unitUnsupported=true;m.geoFlags.push(`Escala suspeita: com a unidade declarada (${us.label}) o modelo mede ${fmt(ext*s,3)} m — possível conversão duplicada; resultados marcados como inconclusivos`)}
   }
@@ -2037,6 +2043,13 @@ async function handleFiles(files){
 }
 /* etapa da leitura do IFC: atualiza o painel e devolve o controle ao navegador para desenhá-lo
    (cada etapa do leitor é uma operação única do web-ifc, sem contagem parcial: indicador indeterminado) */
+/* mensagens do leitor IFC em linguagem compreensível (o texto técnico original fica no console) */
+function ifcErrorText(e){
+  const t=String((e&&e.message)||e||"");
+  if(/Aborted|abort\(/i.test(t)) return "o leitor IFC interrompeu a leitura deste arquivo (estrutura não suportada ou memória do leitor esgotada). Tente abrir o arquivo sozinho num projeto novo; se persistir, envie o arquivo para análise";
+  if(/memory|allocation|out of bounds/i.test(t)) return "memória insuficiente no leitor IFC para este arquivo";
+  return t;
+}
 async function loadStage(t){progress.update({stage:t,done:null,total:null});await new Promise(r=>setTimeout(r,20))}
 function fmtSize(b){return b>=1048576?`${(b/1048576).toLocaleString("pt-BR",{maximumFractionDigits:1})} MB`:`${Math.max(1,Math.round(b/1024))} kB`}
 function removeModel(id){
@@ -2293,7 +2306,7 @@ async function openAbout(){
   if(window.coordixDesktop&&window.coordixDesktop.info){
     try{const i=await window.coordixDesktop.info();rows=[["Edição","COORDIX Desktop (Windows)"],["Versão",`${i.versao} · ${i.rotulo}`]]}catch(e){}
   }
-  rows.push(["Desenvolvido por","Eng. Brunno Resplandes"],["Núcleo geométrico","coordix-geometria.js · precisão dupla · BVH"],["Leitor IFC","web-ifc 0.0.39"],["Visualizador","three.js r147"],["Análise","em segundo plano (Web Worker)"]);
+  rows.push(["Desenvolvido por","Eng. Brunno Resplandes"],["Núcleo geométrico","coordix-geometria.js · precisão dupla · BVH"],["Leitor IFC",`web-ifc ${WEBIFC_VERSION}`],["Visualizador","three.js r147"],["Análise","em segundo plano (Web Worker)"]);
   $("#aboutKv").innerHTML=rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
   $("#aboutDlg").showModal();
 }

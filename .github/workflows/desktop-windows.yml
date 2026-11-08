@@ -32,6 +32,9 @@ jobs:
           node testes/comparativo_v1.js
           node testes/bvh.test.js
 
+      - name: Comparação dos leitores IFC (web-ifc 0.0.39 × 0.0.78)
+        run: node testes/comparar-leitores.js
+
       - name: Teste dos caminhos de recursos do desktop
         run: node desktop/scripts/testar-recursos.js
 
@@ -58,5 +61,6 @@ jobs:
             out/make/zip/win32/x64/*.zip
             desktop-fumaca-*.json
             desktop-instalador.json
+            testes/comparar-leitores.json
           if-no-files-found: warn
           retention-days: 30

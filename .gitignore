@@ -8,3 +8,4 @@ node_modules/
 out/
 desktop/vendor/
 desktop-fumaca-*.json
+testes/comparar-leitores.json
