@@ -77,7 +77,7 @@ Esta branch (`desktop-electron`) acrescenta uma versão desktop com Electron. El
 ```bash
 npm install
 npm start        # executa o COORDIX Desktop
-npm run make     # gera out/make/squirrel.windows/x64/COORDIX-Setup-0.1.0-beta.exe
+npm run make     # gera out/make/squirrel.windows/x64/COORDIX-Setup-0.2.0-beta.exe
 ```
 
 O instalador também é gerado automaticamente a cada envio para esta branch: aba **Actions** → "COORDIX Desktop (Windows)" → artefato **COORDIX-Desktop-windows-beta**. Detalhes, segurança e testes estão em [`docs/desktop-electron.md`](docs/desktop-electron.md).

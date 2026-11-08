@@ -165,3 +165,75 @@ Na segunda abertura:
 3. **Desinstalação.** O Squirrel remove a pasta do aplicativo em segundo plano. Se algum arquivo estiver em uso, a remoção termina na próxima execução do `Update.exe` ou depois de reiniciar.
 4. **Assinatura.** O instalador não é assinado digitalmente, então o SmartScreen pode alertar.
 5. **Tamanho.** O instalador tem cerca de 150 MB porque inclui o Chromium do Electron.
+
+## 7. Versão 0.2.0-beta (08/11/2026)
+
+**Restauração:** a versão anterior (0.1.0-beta) está na branch `backup/desktop-electron-2026-11-08-0955` (commit `6b2a6f4`). A web oficial antes desta rodada está em `backup/main-2026-11-08-0955` (commit `0caa399`). A `main` não foi alterada.
+
+### O que mudou
+
+**Entrega A, estabilidade:**
+- A avaliação geométrica dos pares roda num Web Worker (`coordix-analise-worker.js`), com o mesmo núcleo, os mesmos pares, a mesma ordem e as mesmas opções. A seleção dos pares, a consolidação e a pré-classificação continuam no app.
+- Painel de progresso com a etapa atual:
+  - na análise: seleção dos pares, preparo das malhas e avaliação dos pares, com contagem e percentual reais;
+  - na leitura de IFC: o painel mostra a etapa, e o indicador é indeterminado, porque cada etapa do web-ifc é uma operação única, sem contagem parcial.
+- **Cancelar** encerra o worker, e os resultados anteriores ficam intactos.
+- Mensagens de erro compreensíveis. A falha interna num par vira "inconclusivo", nunca "sem conflito".
+- Corrigido: ao escolher vários IFCs de uma vez, só o primeiro era lido.
+
+**Entrega B, projetos:**
+- Menu **Projeto**: Novo, Abrir (.coordix), Salvar, Salvar como, Importar modelos IFC e Excluir. Atalhos Ctrl+O, Ctrl+S e Ctrl+Shift+S.
+- O formato `.coordix` é JSON versionado (`formato: "coordix-projeto"`, `versao: 1`) e guarda:
+  - todos os dados do projeto;
+  - as referências aos IFCs (nome, disciplina, tamanho, SHA-256, caminho absoluto e caminho relativo ao `.coordix`);
+  - um retrato da última análise.
+- Os IFCs não são copiados.
+- Ao abrir, cada IFC é localizado (caminho salvo, depois caminho relativo, depois a mesma pasta) e conferido pela assinatura:
+  - os encontrados são recarregados e a análise é refeita, reaplicando as decisões;
+  - os ausentes ou alterados aparecem em "Modelos vinculados ao projeto", com **Localizar…** ou **Carregar mesmo assim**.
+- O arquivo é gravado de forma atômica: primeiro num temporário, que é conferido, depois a versão anterior vira `.bak` e o novo é renomeado.
+- **Excluir projeto** pede confirmação com o nome e o que será removido, e avisa que nenhum arquivo do computador é apagado.
+- Segurança no desktop: só são lidos IFCs que o usuário escolheu (diálogo ou arrastar) ou que constam num `.coordix` que ele abriu.
+
+**Entrega C, identidade:**
+- Nova disciplina **MET (Estrutura Metálica)** com 7 testes próprios na matriz (MET×MET, ×EST, ×ARQ, ×SAN, ×HVAC, ×ELE, ×PCI), editáveis em separado.
+- A MET também entra:
+  - nas regras de nó estrutural e de arquitetura × estrutura;
+  - na ordem de flexibilidade.
+- Os projetos já salvos recebem os testes novos sem alteração dos existentes.
+- "Visus" saiu dos textos da interface. A função interna `visusFields` foi mantida.
+- Versão e desenvolvedor saíram da faixa vertical e foram para **Sobre o COORDIX** (botão ⓘ na barra superior).
+
+### Testes
+
+Executados no Windows, execução 42489355923, commit `a6a87be`:
+
+| Teste | Resultado |
+|---|---|
+| Núcleo geométrico | 101/101; BVH 81/81; comparativo com a v1 igual |
+| Resolução de recursos | 25/25 |
+| Fumaça, desenvolvimento | 30/30 |
+| Fumaça, empacotado | 30/30 |
+| Instalador `COORDIX-Setup-0.2.0-beta.exe` | instalou, criou o atalho no menu Iniciar e o removeu na desinstalação |
+
+A fumaça passou a conferir também:
+- Sobre o COORDIX;
+- a MET na matriz;
+- a ausência de "Visus";
+- o ciclo novo projeto → 2 IFCs → análise com painel de progresso → Salvar → Excluir → Abrir, com os IFCs reencontrados e a análise idêntica;
+- o `.coordix` versionado, com SHA-256 e caminhos, sem cópia dos IFCs;
+- os IFCs originais intactos (mesmo SHA-256);
+- a recuperação depois de fechar e abrir.
+
+**No navegador** (mesmo `index.html`):
+- o resultado do exemplo é idêntico ao da web oficial: mesma lista de 8 + 13 clashes, com a mesma assinatura de conteúdo;
+- o modelo de carga G (3 588 elementos) deu o mesmo resultado nas duas versões: 424 confirmados, 10 abaixo da tolerância, 780 contatos e 1 sem conflito;
+- o maior bloqueio da interface durante a análise caiu de 518 ms para 166 ms;
+- o cancelamento manteve os resultados anteriores, e uma nova análise funcionou em seguida.
+
+### Limitações e pendências
+
+- **Melhoria 2 (representação gráfica):** aguarda IFCs de referência com o problema. As correções possíveis (segmentação de círculos, varreduras e booleanas do web-ifc) mudam a geometria usada na análise e precisam ser validadas com esses arquivos.
+- A leitura do IFC ainda bloqueia a interface durante cada etapa do web-ifc. O painel mostra a etapa, mas não há percentual nem cancelamento. Levar o web-ifc para um Worker exige reorganizar o acesso às propriedades, e fica como próximo passo.
+- Não testei a atualização da 0.1.0 para a 0.2.0 por cima da versão instalada; o teste fez instalação limpa. O Squirrel trata versões maiores como atualização.
+- Os IFCs de carga (`testes/ifc-carga/`) são geometria simples. Modelos reais grandes ainda não foram medidos.
