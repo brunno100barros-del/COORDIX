@@ -126,7 +126,7 @@ const PASSOS = {
     if (op) {
       sel.value = op.value; sel.dispatchEvent(new Event('change', { bubbles: true })); await sl(800);
       $('[data-nav=modelos]')?.click(); await sl(600);
-      r.vinculados = /Modelos vinculados ao projeto/.test($('#main').innerText);
+      r.vinculados = /Modelos vinculados ao projeto/i.test($('#main').innerText);
       $('[data-link=todos]')?.click();
       const ok = await esperar(() => [...document.querySelectorAll('.toast')].some(t => /clashes encontrados/.test(t.textContent)), 120000);
       r.recarregados = !!ok;
