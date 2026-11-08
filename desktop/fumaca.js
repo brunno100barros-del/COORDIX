@@ -64,7 +64,7 @@ const PASSOS = {
     $('#drop')?.click();
     r.modelosCarregados = !!(await esperar(() => document.querySelectorAll('#main tbody tr').length >= antes + 2 && (document.body.innerText.match(/FUMACA-/g) || []).length >= 2, 120000));
     r.linhasModelos = [antes, document.querySelectorAll('#main tbody tr').length];
-    r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\\n')[0]).filter(Boolean);
+    r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split(String.fromCharCode(10))[0]).filter(Boolean);
     // identidade: disciplina MET nas regras e nenhum "Visus" nos textos da interface
     let textos = '';
     for (const v of ['projeto','modelos','visualizador','regras','clashes','revisao','issues','bcf']) {
@@ -102,7 +102,7 @@ const PASSOS = {
     $('[data-nav=clashes]')?.click(); await sl(500);
     r.analiseReaberto = geo();
     $('[data-nav=modelos]')?.click(); await sl(500);
-    r.modelosReaberto = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\n')[0]).filter(Boolean);
+    r.modelosReaberto = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split(String.fromCharCode(10))[0]).filter(Boolean);
     await sl(1500); // gravação do localStorage (atraso de 250 ms no app) e fim de leitura
     return r;
   })()`,
@@ -118,7 +118,7 @@ const PASSOS = {
     $('[data-nav=issues]')?.click(); await sl(600);
     r.issues = document.querySelectorAll('tr[data-issue]').length;
     $('[data-nav=modelos]')?.click(); await sl(600);
-    r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\\n')[0]).filter(Boolean);
+    r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split(String.fromCharCode(10))[0]).filter(Boolean);
     try { r.armazenamentoOk = !!JSON.parse(localStorage.getItem('bimora.v1')).projects.length; } catch (e) { r.armazenamentoOk = false; }
     // recuperação: o projeto salvo continua no COORDIX e reabre os IFCs vinculados pelo botão "Carregar todos"
     const sel = $('#projectSelect'), op = [...(sel?.options || [])].find(o => /Projeto Fumaça/.test(o.textContent));
