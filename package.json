@@ -1,7 +1,7 @@
 {
   "name": "coordix",
   "productName": "COORDIX",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "BIMOFFICE: COORDIX, coordenação BIM e detecção de interferências em modelos IFC (versão desktop experimental)",
   "author": "Eng. Brunno Resplandes",
   "license": "UNLICENSED",

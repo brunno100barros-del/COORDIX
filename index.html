@@ -809,7 +809,12 @@ function setViewerMsg(t){const m=$("#vmsg");if(m) m.innerHTML=t||""}
 function mountViewer(slot){const v=$("#viewer");v.hidden=false;slot.appendChild(v);resizeViewer()}
 
 /* --- leitura de um modelo --- */
-let GLOBAL_OFFSET=null;
+/* Origem local do PROJETO (metros, eixo Y para cima): subtraída de todas as coordenadas dos IFCs do projeto,
+   preservando a posição relativa entre eles. Definida pelo 1º modelo lido com sucesso (centro robusto: mediana
+   dos centros dos elementos, imune a elementos isolados na origem) e guardada no projeto. A análise usa Float64
+   relativo a esta origem; o desenho usa Float32 relativo ao centro de cada malha (sem perda de precisão). */
+function projOffset(pid){const P=DB.projects.find(p=>p.id===pid);return P&&Array.isArray(P.origemLocal)?P.origemLocal:null}
+const median=a=>{if(!a.length) return 0;const s=Float64Array.from(a).sort();const h=s.length>>1;return s.length%2?s[h]:(s[h-1]+s[h])/2};
 async function loadIfc(projectId, file, bytes, origem){
   const list=S.models[projectId]||(S.models[projectId]=[]);
   const code=codeFromFile(file);
@@ -825,6 +830,7 @@ async function loadIfc(projectId, file, bytes, origem){
     m.stage="abertura do arquivo";
     await loadStage(`Abrindo ${file} (leitura do IFC)`);
     const mid=api.OpenModel(new Uint8Array(bytes),IFC_LOADER_SETTINGS);
+    bytes=null; // o leitor já copiou o arquivo: libera o original (arquivos grandes)
     if(mid<0) throw new Error("o leitor IFC não conseguiu abrir o arquivo");
     m.mid=mid;
     await loadStage("Lendo pavimentos, PropertySets, tipos e sistemas");
@@ -914,7 +920,7 @@ function buildGeometry(m){
   const mid=m.mid,T=WEBIFC;
   const ids=code=>code==null?[]:vec(api.GetLineIDsWithType(mid,code));
   const perEl=new Map(); // eid → {geoms:[{p,n,i,color}]}
-  let origin=null;
+  let origin=null;const cx=[],cy=[],cz=[]; // centros dos elementos (para a origem robusta)
   let rawMin=[Infinity,Infinity,Infinity],rawMax=[-Infinity,-Infinity,-Infinity];
   m.stage="geometria";
   m.geoFailures=[];m.unprocessed=[];
@@ -933,14 +939,17 @@ function buildGeometry(m){
     const r=GEOC.readElementGeometries(refs,reader); // cada falha é registrada; recursos liberados em finally
     for(const f of r.failures) m.geoFailures.push({eid,geometryExpressID:f.ref&&f.ref.geometryExpressID,stage:f.stage,reason:f.reason});
     if(!r.geoms.length){m.unprocessed.push({eid,reason:r.failures.map(f=>`${f.stage}: ${f.reason}`).join("; ")||"sem representação"});return}
+    let ex0=Infinity,ey0=Infinity,ez0=Infinity,ex1=-Infinity,ey1=-Infinity,ez1=-Infinity;
     for(const g of r.geoms){
       const c=g.ref.color;g.c=[c.x,c.y,c.z,c.w];delete g.ref;
       const W=g.w;
       for(let k=0;k<W.length;k+=3){const X=W[k],Y=W[k+1],Z=W[k+2];
-        if(X<rawMin[0])rawMin[0]=X;if(Y<rawMin[1])rawMin[1]=Y;if(Z<rawMin[2])rawMin[2]=Z;
-        if(X>rawMax[0])rawMax[0]=X;if(Y>rawMax[1])rawMax[1]=Y;if(Z>rawMax[2])rawMax[2]=Z;
+        if(X<ex0)ex0=X;if(Y<ey0)ey0=Y;if(Z<ez0)ez0=Z;if(X>ex1)ex1=X;if(Y>ey1)ey1=Y;if(Z>ez1)ez1=Z;
         if(!origin) origin=[X,Y,Z]}
     }
+    if(ex0<=ex1){if(ex0<rawMin[0])rawMin[0]=ex0;if(ey0<rawMin[1])rawMin[1]=ey0;if(ez0<rawMin[2])rawMin[2]=ez0;
+      if(ex1>rawMax[0])rawMax[0]=ex1;if(ey1>rawMax[1])rawMax[1]=ey1;if(ez1>rawMax[2])rawMax[2]=ez1;
+      cx.push((ex0+ex1)/2);cy.push((ey0+ey1)/2);cz.push((ez0+ez1)/2)}
     perEl.set(eid,{geoms:r.geoms,integrity:r.integrity,failures:r.failures.map(f=>({geometryExpressID:f.ref&&f.ref.geometryExpressID,stage:f.stage,reason:f.reason}))});
   });
   // produtos com representação para os quais o leitor não gerou nenhuma malha (não podem sumir em silêncio)
@@ -968,17 +977,21 @@ function buildGeometry(m){
     if(!pl.ok){m.unitUnsupported=true;m.geoFlags.push(`Escala suspeita: com a unidade declarada (${us.label}) o modelo mede ${fmt(ext*s,3)} m — possível conversão duplicada; resultados marcados como inconclusivos`)}
   }
   m.unitLabel=us.label;
-  const o=[origin[0]*s,origin[1]*s,origin[2]*s];
-  if(!GLOBAL_OFFSET) GLOBAL_OFFSET=o.map(v=>Math.round(v));
-  let farMax=0;
+  // centro robusto do modelo (mediana dos centros dos elementos, em metros)
+  const centro=[median(cx)*s,median(cy)*s,median(cz)*s];
+  const Pj=DB.projects.find(p=>p.id===m.projectId);
+  let OFF=projOffset(m.projectId);
+  if(!OFF){OFF=centro.map(v=>Math.round(v));if(Pj){Pj.origemLocal=OFF;save()}}
+  m.offset=OFF;
+  // modelo em outro sistema de coordenadas (ex.: um IFC em coordenadas compartilhadas/UTM e outro na origem interna)
+  const dist=Math.hypot(centro[0]-OFF[0],centro[1]-OFF[1],centro[2]-OFF[2]);
+  if(dist>GEOC.GEO.FAR_COORD) m.geoFlags.push(`Este modelo está a ${fmt(dist/1000,1)} km dos demais modelos do projeto: provavelmente foi exportado em outro sistema de coordenadas (compartilhadas × internas). A posição foi mantida como está no arquivo; confira a exportação`);
   for(const rec of perEl.values()) for(const g of rec.geoms){
     const W=g.w,P64=new Float64Array(W.length);
-    for(let k=0;k<W.length;k+=3){P64[k]=W[k]*s-GLOBAL_OFFSET[0];P64[k+1]=W[k+1]*s-GLOBAL_OFFSET[1];P64[k+2]=W[k+2]*s-GLOBAL_OFFSET[2];
-      const f=Math.max(Math.abs(P64[k]),Math.abs(P64[k+1]),Math.abs(P64[k+2]));if(f>farMax) farMax=f}
-    g.p64=P64;g.p=Float32Array.from(P64);delete g.w; // p (Float32) só para desenho e seleção; p64 para a análise
+    for(let k=0;k<W.length;k+=3){P64[k]=W[k]*s-OFF[0];P64[k+1]=W[k+1]*s-OFF[1];P64[k+2]=W[k+2]*s-OFF[2]}
+    g.p64=P64;delete g.w; // Float64 relativo à origem do projeto (análise); o desenho é gerado relativo ao centro de cada malha
   }
-  if(farMax>GEOC.GEO.FAR_COORD) m.geoFlags.push(`Coordenadas a ${fmt(farMax/1000,1)} km da origem comum do projeto: a visualização perde precisão; a análise geométrica usa precisão dupla`);
-  m.storeysY=m.storeys.map(st=>({...st,y:st.elev*m.lengthScale-GLOBAL_OFFSET[1]}));
+  m.storeysY=m.storeys.map(st=>({...st,y:st.elev*m.lengthScale-OFF[1]}));
   const chunks=new Map();
   for(const [eid,rec] of perEl){
     let l;try{l=api.GetLine(mid,eid,false)}catch(e){m.skipped["elemento sem atributos"]=(m.skipped["elemento sem atributos"]||0)+1;l={type:null,expressID:eid}}
@@ -999,16 +1012,17 @@ function buildGeometry(m){
     ELEMS.push(el);m.elems.push(el.idx);
     for(const g of rec.geoms){
       const key=g.c.map(v=>v.toFixed(3)).join(",");
-      const ch=chunks.get(key)||{c:g.c,parts:[],nv:0,ni:0};ch.parts.push({g,idx:el.idx});ch.nv+=g.p.length/3;ch.ni+=g.i.length;chunks.set(key,ch);
+      const ch=chunks.get(key)||{c:g.c,parts:[],nv:0,ni:0};ch.parts.push({g,idx:el.idx});ch.nv+=g.p64.length/3;ch.ni+=g.i.length;chunks.set(key,ch);
     }
   }
   for(const ch of chunks.values()){
     const P=new Float32Array(ch.nv*3),N=new Float32Array(ch.nv*3),E=new Float32Array(ch.nv),I=new Uint32Array(ch.ni);
+    const ctr=partsCenter(ch.parts.map(x=>x.g));
     let vo=0,io=0;
     for(const {g,idx} of ch.parts){
-      P.set(g.p,vo*3);N.set(g.n,vo*3);E.fill(idx,vo,vo+g.p.length/3);
+      const n=g.p64.length/3;writeRel(P,vo*3,g.p64,ctr);N.set(g.n,vo*3);E.fill(idx,vo,vo+n);
       for(let k=0;k<g.i.length;k++) I[io+k]=g.i[k]+vo;
-      vo+=g.p.length/3;io+=g.i.length;
+      vo+=n;io+=g.i.length;
     }
     const geo=new THREE.BufferGeometry();
     geo.setAttribute("position",new THREE.BufferAttribute(P,3));geo.setAttribute("normal",new THREE.BufferAttribute(N,3));
@@ -1016,25 +1030,32 @@ function buildGeometry(m){
     const op=ch.c[3];
     const mat=new THREE.MeshLambertMaterial({color:new THREE.Color(ch.c[0],ch.c[1],ch.c[2]),transparent:op<1,opacity:op,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
     mat.userData.base={op,transparent:op<1};
-    const mesh=new THREE.Mesh(geo,mat);mesh.userData.model=m.id;
+    const mesh=new THREE.Mesh(geo,mat);mesh.userData.model=m.id;mesh.position.set(ctr[0],ctr[1],ctr[2]);
     m.chunks.push(mesh);
   }
 }
+/* desenho "relativo ao centro": vértices em Float32 relativos ao centro da malha; o centro fica na posição do
+   objeto (dupla precisão). Assim a precisão do desenho não depende da distância até a origem. */
+function partsCenter(gs){let x0=Infinity,y0=Infinity,z0=Infinity,x1=-Infinity,y1=-Infinity,z1=-Infinity;
+  for(const g of gs){const P=g.p64;for(let k=0;k<P.length;k+=3){const X=P[k],Y=P[k+1],Z=P[k+2];if(X<x0)x0=X;if(Y<y0)y0=Y;if(Z<z0)z0=Z;if(X>x1)x1=X;if(Y>y1)y1=Y;if(Z>z1)z1=Z}}
+  return x0<=x1?[(x0+x1)/2,(y0+y1)/2,(z0+z1)/2]:[0,0,0]}
+function writeRel(dst,o,P,c){for(let k=0;k<P.length;k+=3){dst[o+k]=P[k]-c[0];dst[o+k+1]=P[k+1]-c[1];dst[o+k+2]=P[k+2]-c[2]}}
 function attachModel(m){for(const c of m.chunks){c.visible=m.visible;V.root.add(c)}V.dirty=true}
 function detachAll(){for(const c of [...V.root.children]) V.root.remove(c);clearHL();V.dirty=true}
 function attachProject(pid){detachAll();for(const m of (S.models[pid]||[])) if(m.status==="pronto") attachModel(m);applyGhost();setViewerMsg((S.models[pid]||[]).length?"":"Nenhum modelo carregado neste projeto. Envie IFCs em Modelos IFC.")}
 
 /* --- seleção, destaque, isolamento --- */
 function subsetMesh(idxs,color,{offset=0,useOwn=false}={}){
-  let nv=0,ni=0;for(const i of idxs) for(const g of ELEMS[i].geoms){nv+=g.p.length/3;ni+=g.i.length}
+  let nv=0,ni=0;for(const i of idxs) for(const g of ELEMS[i].geoms){nv+=g.p64.length/3;ni+=g.i.length}
+  const ctr=partsCenter(idxs.flatMap(i=>ELEMS[i].geoms));
   const P=new Float32Array(nv*3),N=new Float32Array(nv*3),E=new Float32Array(nv),C=useOwn?new Float32Array(nv*3):null,I=new Uint32Array(ni);let vo=0,io=0;
-  for(const i of idxs) for(const g of ELEMS[i].geoms){const n=g.p.length/3;P.set(g.p,vo*3);N.set(g.n,vo*3);E.fill(i,vo,vo+n);
+  for(const i of idxs) for(const g of ELEMS[i].geoms){const n=g.p64.length/3;writeRel(P,vo*3,g.p64,ctr);N.set(g.n,vo*3);E.fill(i,vo,vo+n);
     if(C) for(let k=0;k<n;k++){C[(vo+k)*3]=g.c[0];C[(vo+k)*3+1]=g.c[1];C[(vo+k)*3+2]=g.c[2]}
     for(let k=0;k<g.i.length;k++) I[io+k]=g.i[k]+vo;vo+=n;io+=g.i.length}
   const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.BufferAttribute(P,3));geo.setAttribute("normal",new THREE.BufferAttribute(N,3));
   geo.setAttribute("eid",new THREE.BufferAttribute(E,1));if(C) geo.setAttribute("color",new THREE.BufferAttribute(C,3));geo.setIndex(new THREE.BufferAttribute(I,1));
   const mat=new THREE.MeshLambertMaterial({color:useOwn?0xffffff:color,vertexColors:useOwn,side:THREE.DoubleSide,polygonOffset:offset!==0,polygonOffsetFactor:offset,polygonOffsetUnits:offset*4});
-  return new THREE.Mesh(geo,mat);
+  const mesh=new THREE.Mesh(geo,mat);mesh.position.set(ctr[0],ctr[1],ctr[2]);return mesh;
 }
 function clearGroup(gr){for(const c of [...gr.children]){gr.remove(c);c.geometry.dispose();c.material.dispose()}V.dirty=true}
 function clearHL(){clearGroup(V.hl)}
@@ -1059,8 +1080,12 @@ function isolate(idxs){
 }
 function clearIsolation(){clearGroup(V.iso);setGhost(false)}
 function boxOf(idxs){const b=new THREE.Box3();for(const i of idxs) b.union(ELEMS[i].box);return b}
+/* diagnóstico somente leitura (usado pelo teste de fumaça): origem do projeto e maior coordenada dos vértices desenhados */
+window.coordixDiagnostico=()=>{let vMax=0,pMax=0;for(const c of V.root.children){const a=c.geometry&&c.geometry.attributes.position;if(!a) continue;
+  for(let k=0;k<a.array.length;k++){const v=Math.abs(a.array[k]);if(v>vMax)vMax=v}pMax=Math.max(pMax,Math.abs(c.position.x),Math.abs(c.position.y),Math.abs(c.position.z))}
+  return {projeto:DB.current,origem:projOffset(DB.current),maiorVertice:vMax,maiorPosicaoMalha:pMax,malhas:V.root.children.length}};
 function fitView(box){
-  if(!box){box=new THREE.Box3();for(const c of V.root.children) if(c.visible){c.geometry.computeBoundingBox();box.union(c.geometry.boundingBox)}}
+  if(!box){box=new THREE.Box3();for(const c of V.root.children) if(c.visible) box.expandByObject(c)} // caixa no mundo (malhas relativas ao centro)
   if(box.isEmpty()) return;
   const c=box.getCenter(new THREE.Vector3()),r=Math.max(box.getSize(new THREE.Vector3()).length()/2,0.6);
   const dir=V.camera.position.clone().sub(V.controls.target).normalize();if(dir.lengthSq()<.5) dir.set(1,.8,1).normalize();
@@ -1091,7 +1116,7 @@ function takeSnapshot(){
 }
 function cameraViewpoint(){
   // display (Y para cima, deslocado) → coordenadas IFC (Z para cima, metros)
-  const o=GLOBAL_OFFSET||[0,0,0];
+  const o=projOffset(DB.current)||[0,0,0];
   const p=V.camera.position,d=V.controls.target.clone().sub(p).normalize();
   const toIfc=(x,y,z)=>[x,-z,y];
   const P=toIfc(p.x+o[0],p.y+o[1],p.z+o[2]),D=toIfc(d.x,d.y,d.z);
@@ -2034,9 +2059,8 @@ async function handleFiles(files){
   for(let k=0;k<ifcs.length;k++){
     const f=ifcs[k];
     progress.show({title:"Leitura de modelos IFC",stage:"Carregando o arquivo",detail:`Arquivo ${k+1} de ${ifcs.length} · ${f.name} · ${fmtSize(f.size)}`});
-    const buf=await f.arrayBuffer();
     const cam=window.coordixDesktop&&window.coordixDesktop.origemDoArquivo?window.coordixDesktop.origemDoArquivo(f):null;
-    await loadIfc(P.id,f.name,buf,{caminho:cam});
+    await loadIfc(P.id,f.name,await f.arrayBuffer(),{caminho:cam}); // sem cópia retida aqui: o leitor libera o arquivo bruto após a abertura
   }
   progress.hide();
   if(ifcs.length) toast("Modelos lidos. Execute a análise em Clashes por nível.");
@@ -2060,6 +2084,7 @@ function removeModel(id){
   for(const i of m.elems){ELEMS[i].geoms=[];ELEMS[i]._solid=null;ELEMS[i]._topo=null}
   try{if(m.mid!=null) api.CloseModel(m.mid)}catch(e){}
   S.models[P.id]=list.filter(x=>x!==m);
+  if(!S.models[P.id].length&&P.origemLocal){delete P.origemLocal;save()} // sem modelos: o próximo IFC define a nova origem do projeto
   S.clashes[P.id]=(S.clashes[P.id]||[]).filter(c=>ELEMS[c.a].model!==id&&ELEMS[c.b].model!==id);
   selectElements([],{silent:true});V.dirty=true;renderAll();
 }

@@ -65,6 +65,7 @@ const PASSOS = {
     r.modelosCarregados = !!(await esperar(() => document.querySelectorAll('#main tbody tr').length >= antes + 2 && (document.body.innerText.match(/FUMACA-/g) || []).length >= 2, 120000));
     r.linhasModelos = [antes, document.querySelectorAll('#main tbody tr').length];
     r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split(String.fromCharCode(10))[0]).filter(Boolean);
+    r.alertaSistema = /km dos demais modelos do projeto/.test($('#main').innerText);
     // identidade: disciplina MET nas regras e nenhum "Visus" nos textos da interface
     let textos = '';
     for (const v of ['projeto','modelos','visualizador','regras','clashes','revisao','issues','bcf']) {
@@ -81,6 +82,9 @@ const PASSOS = {
     $('[data-nav=modelos]')?.click(); await sl(500);
     $('#drop')?.click();
     r.novoModelos = !!(await esperar(() => document.querySelectorAll('#main tbody tr').length >= 2 && (document.querySelector('#main tbody')?.innerText.match(/FUMACA-/g) || []).length >= 2 && !/Lendo|lendo/.test(document.querySelector('#main tbody')?.innerText || ''), 120000));
+    r.alertaNovo = /km dos demais modelos do projeto/.test($('#main').innerText);
+    $('[data-nav=visualizador]')?.click(); await sl(800);
+    r.diag = window.coordixDiagnostico ? window.coordixDiagnostico() : null;
     $('[data-nav=clashes]')?.click(); await sl(400);
     $('[data-run]')?.click();
     r.painelProgresso = !!(await esperar(() => $('#progressPanel:not([hidden])') || [...document.querySelectorAll('.toast')].some(t => /clashes encontrados/.test(t.textContent)), 20000));

@@ -18,7 +18,12 @@ const dados = path.join(tmp, "dados");
 const hash = (p) => require("crypto").createHash("sha256").update(fs.readFileSync(p)).digest("hex");
 const arquivos = ["ARQ", "SAN"].map((d) => {
   const destino = path.join(tmp, `FUMACA-${d}.ifc`);
-  fs.copyFileSync(path.join(RAIZ, "exemplos", `EXEMPLO-${d}.ifc`), destino);
+  // cópia deslocada para coordenadas de georreferência (≈ 512 km E, 9.030 km N, como um IFC exportado em UTM):
+  // testa a origem local do projeto e o desenho relativo ao centro. O mesmo deslocamento nos dois arquivos.
+  const txt = fs.readFileSync(path.join(RAIZ, "exemplos", `EXEMPLO-${d}.ifc`), "latin1");
+  if (!txt.includes("#15=IFCLOCALPLACEMENT($,#4);")) throw new Error("posicionamento do terreno não encontrado em EXEMPLO-" + d);
+  fs.writeFileSync(destino, txt.replace("#15=IFCLOCALPLACEMENT($,#4);", "#15=IFCLOCALPLACEMENT($,#999002);")
+    .replace("DATA;", "DATA;\n#999001=IFCCARTESIANPOINT((512345678.,9030612345.,0.));\n#999002=IFCAXIS2PLACEMENT3D(#999001,$,$);"), "latin1");
   return destino;
 });
 
@@ -57,6 +62,10 @@ if (a) {
   ok("2 IFCs carregados pelo diálogo (preload → IPC → <input>)", a.modelosCarregados && a.nomes.includes("FUMACA-ARQ.ifc") && a.nomes.includes("FUMACA-SAN.ifc"), a.nomes);
   ok("disciplina MET (Estrutura Metálica) nas regras", a.met);
   ok("nenhuma menção a 'Visus' na interface", a.visus === false);
+  ok("IFC georreferenciado misturado ao projeto de exemplo: alerta de outro sistema de coordenadas", a.alertaSistema, a.alertaSistema);
+  ok("projeto novo: origem local definida pelos IFCs georreferenciados (≈ 9.030 km) e sem alerta", a.diag && Array.isArray(a.diag.origem) && Math.max(...a.diag.origem.map(Math.abs)) > 9e6 && !a.alertaNovo, [a.diag, a.alertaNovo]);
+  ok("desenho relativo ao centro: vértices pequenos (precisão Float32 preservada)", a.diag && a.diag.malhas > 0 && a.diag.maiorVertice < 200, a.diag);
+  console.log("  análise do projeto novo (IFCs georreferenciados): " + a.analiseNovo);
   ok("novo projeto com 2 IFCs e análise em segundo plano", a.novoModelos && a.painelProgresso && !!a.analiseNovo, [a.novoModelos, a.painelProgresso, a.analiseNovo]);
   ok("Salvar projeto (.coordix)", !!a.salvo && /Projeto Fumaça\.coordix/.test(a.indicadorArquivo || ""), [a.salvo, a.indicadorArquivo]);
   ok("Excluir projeto: confirmação com o nome e aviso de que nenhum arquivo é apagado", /Projeto Fumaça/.test(a.confirmacaoExclusao || "") && /não são apagados/.test(a.confirmacaoExclusao || "") && !!a.excluido && !a.projetosAposExcluir.some((n) => /Fumaça/.test(n)), [a.confirmacaoExclusao, a.projetosAposExcluir]);

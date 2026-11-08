@@ -97,6 +97,9 @@ async function abrirIfc(evt) {
   return saida;
 }
 
+// IFCs grandes: limite do heap JavaScript da página no máximo permitido pelo Electron (4 GB, compressão de ponteiros)
+app.commandLine.appendSwitch("js-flags", "--max-old-space-size=4096");
+
 app.whenReady().then(() => {
   protocol.handle(ESQUEMA, servir);
   protocol.handle("https", servir); // CDN → cópia local; o resto da internet é recusado
