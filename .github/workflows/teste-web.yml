@@ -1,0 +1,23 @@
+name: Teste da versão web (branch temporária)
+on:
+  push:
+    branches: [teste/web-2.4]
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Testes do núcleo geométrico
+        run: node testes/geometria.test.js && node testes/comparativo_v1.js
+      - name: Instalar Playwright (só no teste)
+        run: npm install --no-save --no-audit --no-fund playwright@1.49.1 && npx playwright install --with-deps chromium
+      - name: Teste de fumaça web
+        run: |
+          python3 -m http.server 8000 >/dev/null 2>&1 &
+          sleep 2
+          node teste-web/fumaca-web.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: teste-web, path: teste-web/*.png, if-no-files-found: ignore }
