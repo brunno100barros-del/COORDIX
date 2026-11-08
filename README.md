@@ -70,6 +70,18 @@ Primeiro protótipo, publicado como BIMORA.
 - Todas as funcionalidades preservadas; núcleo geométrico sem alteração.
 - Relatório: `docs/redesign-industrial-precision.md`.
 
+## Versão desktop (Windows, experimental)
+
+Esta branch (`desktop-electron`) acrescenta uma versão desktop com Electron. Ela usa o **mesmo** `index.html` e o mesmo núcleo geométrico da versão web, carregados dos arquivos locais e funcionando sem internet. A versão oficial continua sendo a web, publicada a partir da `main`.
+
+```bash
+npm install
+npm start        # executa o COORDIX Desktop
+npm run make     # gera out/make/squirrel.windows/x64/COORDIX-Setup-0.1.0-beta.exe
+```
+
+O instalador também é gerado automaticamente a cada envio para esta branch: aba **Actions** → "COORDIX Desktop (Windows)" → artefato **COORDIX-Desktop-windows-beta**. Detalhes, segurança e testes estão em [`docs/desktop-electron.md`](docs/desktop-electron.md).
+
 ## Como rodar
 
 O app é estático: basta servir a pasta por HTTP. Abrir o `index.html` direto do disco não funciona, porque o navegador bloqueia o carregamento do `.wasm`.
