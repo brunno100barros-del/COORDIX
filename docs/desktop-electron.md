@@ -278,3 +278,39 @@ A fumaça passou a conferir também:
 **Não validado:**
 - os IFCs reais do projeto. O arquivo de SPDA enviado não foi colocado no repositório público e precisa ser conferido no aplicativo instalado;
 - o uso de memória com muitos modelos abertos ao mesmo tempo (o leitor mantém cada modelo aberto para consultar as propriedades).
+
+## 9. Versão 0.4.0-beta (08/11/2026): coordenadas georreferenciadas e memória
+
+**Problema:**
+- a origem usada para converter as coordenadas era única por sessão e vinha do 1º modelo aberto, sempre o projeto de exemplo, perto de 0,0,0;
+- IFCs exportados em coordenadas compartilhadas (UTM) ficavam a cerca de 9.030 km dessa origem;
+- o desenho em Float32 perdia precisão nessa distância: com passo de cerca de 0,5 m, as geometrias apareciam distorcidas;
+- a análise não era afetada, porque usa Float64.
+
+**Solução (sem mover nem alterar os IFCs):**
+- **Origem local por projeto:** definida pelo 1º IFC lido no projeto e guardada no projeto e no `.coordix`. Todos os IFCs do projeto usam a mesma origem, então a posição relativa entre eles é preservada.
+  - A origem é o 1º vértice do modelo, a mesma referência das versões anteriores, por isso os resultados de referência ficam idênticos.
+  - Se esse vértice estiver longe do modelo (um elemento perdido na origem interna), o COORDIX usa a mediana dos centros dos elementos.
+  - Ao remover todos os modelos do projeto, a origem é redefinida pelo próximo IFC.
+- **Desenho relativo ao centro:** cada malha guarda vértices em Float32 relativos ao seu centro, e a posição do objeto fica em dupla precisão. A precisão do desenho não depende mais da distância até a origem.
+- **BCF:** os viewpoints continuam em coordenadas do IFC (origem do projeto somada de volta).
+- **Alerta:** um modelo a mais de 5 km dos demais do mesmo projeto é sinalizado como "provavelmente exportado em outro sistema de coordenadas". A posição é mantida como está no arquivo.
+
+**Memória:**
+- o arquivo bruto é liberado logo depois que o leitor o abre;
+- a cópia Float32 por elemento foi eliminada (o desenho é gerado a partir da geometria Float64);
+- o heap JavaScript da página foi elevado ao máximo do Electron (4 GB).
+
+O leitor IFC (WebAssembly de 32 bits) continua limitado a 4 GB. Um IFC de 1,5 GB pode passar disso durante a leitura.
+
+**Testes** (execução 42510859369, commit da versão 0.4.0):
+- núcleo, BVH, comparação dos leitores e recursos: aprovados;
+- fumaça 33/33 em desenvolvimento e 33/33 no app empacotado.
+  - Novas verificações usam cópias dos exemplos deslocadas para 512 km E / 9.030 km N: origem do projeto ≈ 9.030 km, maior vértice desenhado menor que 200 m, alerta ao misturar com o projeto de exemplo.
+  - O resultado de referência do exemplo continua `21 confirmado · 1 abaixo da tolerância · 10 contato · 33 sólidos válidos`.
+- instalador: instalação, atalho e desinstalação conferidos.
+
+**Observação técnica:**
+- numa tentativa intermediária, com a origem na mediana dos centros, 2 elementos do exemplo mudaram de classificação topológica (33 para 31 sólidos válidos, 10 para 8 contatos);
+- a fusão de vértices (0,01 mm) é sensível à origem nesses elementos, por isso a origem padrão voltou ao 1º vértice;
+- o ponto fica registrado para investigação no núcleo geométrico, que não foi alterado.
