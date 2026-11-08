@@ -118,3 +118,50 @@ Os arquivos gerados ficam em:
 - A desinstalação é pelo caminho normal: Configurações → Aplicativos → COORDIX.
 - O instalador não é assinado digitalmente. Por isso, o Windows SmartScreen pode avisar na primeira execução ("Mais informações" → "Executar assim mesmo").
 - Não há atualização automática.
+
+## 5. Testes realizados
+
+Os testes rodaram numa máquina Windows do GitHub Actions (`windows-latest`, Node 22, Electron 44.9.3), na execução 42430300626 do commit `0068785`. Todos passaram.
+
+| Teste | Resultado |
+|---|---|
+| Núcleo geométrico no Windows: `geometria.test.js`, `bvh.test.js`, `comparativo_v1.js` | 101/101, 81/81 e comparativo inalterado (v1 com 19 erros, v2 com 0) |
+| Resolução de recursos: arquivos permitidos, CDN local e tentativas de sair da pasta ou acessar a internet | 24/24 |
+| Fumaça, aplicativo em desenvolvimento, duas aberturas com os mesmos dados | 21/21 |
+| Fumaça, aplicativo empacotado (`COORDIX.exe`) | 21/21 |
+| Instalador | `COORDIX-Setup-0.1.0-beta.exe` (149,6 MB) instalado em modo silencioso. Executável criado, atalho em Menu Iniciar\BIMOFFICE\COORDIX.lnk. Na desinstalação, o atalho foi removido e a remoção da pasta foi registrada pelo Squirrel (marcador `.dead`). |
+
+As 21 verificações da fumaça:
+- o motor IFC lê os 6 exemplos e a análise automática deixa 21 clashes pendentes;
+- o three.js e o canvas WebGL funcionam;
+- as fontes locais carregam;
+- o selo "desenvolvido por" e "BETA" aparece;
+- as 8 telas abrem com conteúdo;
+- o resultado é igual ao da web: 21 confirmados, 1 abaixo da tolerância e 4 contatos; 8 a corrigir e 13 falsos;
+- a revisão abre com câmera e legenda;
+- validar um clash cria um issue (21 → 20 pendentes);
+- o BCF mostra o tópico;
+- o tema claro é aplicado;
+- 2 IFCs entram pelo caminho do diálogo (preload → IPC → `<input>`);
+- não há erros no console;
+- nenhuma requisição externa ou recurso ausente.
+
+Na segunda abertura:
+- os dados continuam íntegros;
+- a decisão (20 pendentes e 1 issue) e o tema continuam salvos;
+- os IFCs escolhidos não ficam salvos, igual à web;
+- não há erros no console.
+
+**Versão web:**
+- a `main` e o `index.html` não mudaram (o `index.html` é o mesmo nas duas branches);
+- testei a `main` no navegador: os exemplos foram lidos, o resultado foi 21 confirmados, 1 abaixo da tolerância e 4 contatos, e a revisão abriu com o 3D.
+
+## 6. Problemas encontrados
+
+1. **CSP.** A primeira execução mostrou que o web-ifc avalia código gerado ao iniciar. `'unsafe-eval'` foi incluído só na CSP do desktop.
+2. **Vários arquivos de uma vez (defeito que também existe na web).** Depois do evento `change`, o app limpa o `<input>` (`t.value = ""`), e o Chromium esvazia a mesma lista que a leitura ainda percorre. Por isso, só o primeiro de vários arquivos escolhidos no seletor é lido; arrastar e soltar não é afetado. Reproduzi isso também na versão web.
+   - No desktop, o preload entrega um arquivo por vez, e todos são lidos.
+   - Na web, a correção é de uma linha (`handleFiles([...t.files])`), mas não foi aplicada, porque esta tarefa não altera a versão web.
+3. **Desinstalação.** O Squirrel remove a pasta do aplicativo em segundo plano. Se algum arquivo estiver em uso, a remoção termina na próxima execução do `Update.exe` ou depois de reiniciar.
+4. **Assinatura.** O instalador não é assinado digitalmente, então o SmartScreen pode alertar.
+5. **Tamanho.** O instalador tem cerca de 150 MB porque inclui o Chromium do Electron.
