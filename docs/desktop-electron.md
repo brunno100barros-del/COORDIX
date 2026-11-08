@@ -237,3 +237,44 @@ A fumaça passou a conferir também:
 - A leitura do IFC ainda bloqueia a interface durante cada etapa do web-ifc. O painel mostra a etapa, mas não há percentual nem cancelamento. Levar o web-ifc para um Worker exige reorganizar o acesso às propriedades, e fica como próximo passo.
 - Não testei a atualização da 0.1.0 para a 0.2.0 por cima da versão instalada; o teste fez instalação limpa. O Squirrel trata versões maiores como atualização.
 - Os IFCs de carga (`testes/ifc-carga/`) são geometria simples. Modelos reais grandes ainda não foram medidos.
+
+## 8. Versão 0.3.0-beta (08/11/2026): leitor IFC atualizado
+
+**Restauração:** a versão anterior (0.2.0-beta) está em `backup/desktop-electron-2026-11-08-1350`, commit `abf5caa`.
+
+**O problema relatado:**
+- Vários modelos IFC2X3, IFC4 e IFC4X3_ADD2 terminavam com "Aborted()" na abertura do arquivo.
+- As formas apareciam distorcidas, com triângulos espúrios, em modelos do Revit (hidráulica, SPDA, conexões).
+
+**Causa:** o leitor web-ifc 0.0.39, de 2023.
+- Ele não conhece o esquema IFC4X3.
+- Ele aborta ou triangula mal geometrias comuns no Revit: perfis com curvas compostas e trechos de círculo (o arquivo de SPDA analisado tem 689 `IfcTrimmedCurve`, 152 `IfcCompositeCurve` e 3 167 conexões por `IfcMappedItem`).
+- As coordenadas do arquivo não eram a causa: a translação UTM (cerca de 9 030 km) fica só na implantação, e o COORDIX a aplica em precisão dupla.
+
+**O que mudou:**
+- **Leitor web-ifc 0.0.78** (21/09/2026): suporta IFC2X3, IFC4 e IFC4X3. A API e o `.wasm` são da mesma versão; no desktop, são servidos por cópia local.
+- **Círculos com 24 segmentos** (antes 12). O polígono inscrito de um tubo Ø100 perdia até 1,7 mm de raio e agora perde 0,4 mm, o que deixa a análise e o desenho mais fiéis.
+- Mensagens de erro do leitor em português, com orientação.
+- **Comparação automática dos dois leitores** no CI (`testes/comparar-leitores.js`): caixas por elemento, triângulos e erros.
+
+**Comparação 0.0.39 × 0.0.78** (12 arquivos: exemplos e modelos de carga):
+- nenhum erro e nenhum elemento perdido com o leitor novo;
+- elementos prismáticos com caixas idênticas;
+- tubos com mais triângulos (efeito dos 24 segmentos) e caixas até 1,8 mm diferentes (mais próximas do diâmetro real).
+
+**Efeito no exemplo:**
+- os mesmos 21 confirmados e 1 abaixo da tolerância;
+- contatos passaram de 4 para 10, e sólidos válidos de 29 para 33: o leitor antigo gerava 4 elementos como malhas inválidas;
+- a classificação ficou igual (8 a corrigir, 13 falsos);
+- a penetração dos tubos passou de 95,9 para 99,1 mm (Ø100).
+
+**Testes** (execução 42507340526, commit `26948c8`):
+- núcleo 101/101 e BVH 81/81;
+- comparação dos leitores: 12 arquivos sem regressão;
+- recursos 27/27;
+- fumaça 30/30 em desenvolvimento e 30/30 no app empacotado;
+- instalador `COORDIX-Setup-0.3.0-beta.exe` (150,8 MB): instalação, atalho e desinstalação conferidos.
+
+**Não validado:**
+- os IFCs reais do projeto. O arquivo de SPDA enviado não foi colocado no repositório público e precisa ser conferido no aplicativo instalado;
+- o uso de memória com muitos modelos abertos ao mesmo tempo (o leitor mantém cada modelo aberto para consultar as propriedades).
