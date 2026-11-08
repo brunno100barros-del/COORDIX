@@ -30,7 +30,8 @@ if (!FUMACA && !app.requestSingleInstanceLock()) app.quit();
 /* CSP aplicada só no aplicativo desktop (a versão web não muda) */
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
+  // 'unsafe-eval': o módulo do web-ifc 0.0.39 (Emscripten) avalia código gerado ao iniciar; sem isso o leitor IFC não carrega
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",

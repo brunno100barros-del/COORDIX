@@ -35,25 +35,25 @@ const PASSOS = {
     r.selo = $('#coordix-desktop-selo')?.innerText || null;
     r.telas = {};
     for (const v of ['projeto','modelos','visualizador','regras','clashes','revisao','issues','bcf']) {
-      $('[data-nav=' + v + ']').click(); await sl(700); r.telas[v] = ($('#main').innerText || '').length;
+      $('[data-nav=' + v + ']')?.click(); await sl(700); r.telas[v] = ($('#main').innerText || '').length;
     }
-    $('[data-nav=clashes]').click(); await sl(500);
+    $('[data-nav=clashes]')?.click(); await sl(500);
     r.geometria = [...document.querySelectorAll('#main .muted')].map(e => e.textContent).find(t => t.includes('Pares verificados')) || null;
     r.abas = [$('[data-ctab=real]')?.textContent, $('[data-ctab=fake]')?.textContent];
-    $('[data-nav=revisao]').click(); await sl(1500);
+    $('[data-nav=revisao]')?.click(); await sl(1500);
     r.revisaoCamera = !!$('#viewer canvas') && !$('#vlegend').hidden;
-    $('#rvConfirm').click(); await sl(1200);
+    $('#rvConfirm')?.click(); await sl(1200);
     r.pendentes1 = $('#reviewPill .num')?.textContent || null;
-    $('[data-nav=issues]').click(); await sl(500);
+    $('[data-nav=issues]')?.click(); await sl(500);
     r.issues = document.querySelectorAll('tr[data-issue]').length;
-    $('[data-nav=bcf]').click(); await sl(500);
+    $('[data-nav=bcf]')?.click(); await sl(500);
     r.bcf = ($('#xml-mk')?.textContent || '').includes('<Topic');
-    document.querySelector('[data-theme-set=light]').click(); await sl(400);
+    document.querySelector('[data-theme-set=light]')?.click(); await sl(400);
     r.tema = document.documentElement.dataset.theme;
     // IFCs pelo diálogo (preload → IPC → <input id="fileInput">)
-    $('[data-nav=modelos]').click(); await sl(600);
+    $('[data-nav=modelos]')?.click(); await sl(600);
     const antes = document.querySelectorAll('#main tbody tr').length;
-    $('#drop').click();
+    $('#drop')?.click();
     r.modelosCarregados = !!(await esperar(() => document.querySelectorAll('#main tbody tr').length > antes && (document.body.innerText.match(/FUMACA-/g) || []).length >= 2, 60000));
     r.linhasModelos = [antes, document.querySelectorAll('#main tbody tr').length];
     r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\\n')[0]).filter(Boolean);
@@ -66,9 +66,9 @@ const PASSOS = {
     r.motor = !!(await esperar(() => $('#reviewPill:not([hidden]) .num'), 120000));
     r.pendentes = $('#reviewPill .num')?.textContent || null;
     r.tema = document.documentElement.dataset.theme;
-    $('[data-nav=issues]').click(); await sl(600);
+    $('[data-nav=issues]')?.click(); await sl(600);
     r.issues = document.querySelectorAll('tr[data-issue]').length;
-    $('[data-nav=modelos]').click(); await sl(600);
+    $('[data-nav=modelos]')?.click(); await sl(600);
     r.nomes = [...document.querySelectorAll('#main tbody tr')].map(tr => tr.cells[0]?.innerText.split('\\n')[0]).filter(Boolean);
     try { r.armazenamentoOk = !!JSON.parse(localStorage.getItem('bimora.v1')).projects.length; } catch (e) { r.armazenamentoOk = false; }
     return r;

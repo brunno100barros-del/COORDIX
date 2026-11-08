@@ -48,7 +48,7 @@ COORDIX.exe (Electron 44)
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` e `webSecurity: true`.
 - O preload expõe só duas funções, sem nenhuma API do Node.
 - O canal de IPC verifica se a chamada vem da página do aplicativo.
-- A CSP é aplicada só no desktop: scripts locais e do CDN espelhado, WASM permitido, `object-src 'none'`.
+- A CSP é aplicada só no desktop: scripts locais e do CDN espelhado, WASM permitido, `object-src 'none'`. Ela inclui `'unsafe-eval'` porque o módulo do web-ifc 0.0.39 avalia código gerado ao iniciar; o primeiro teste no Windows mostrou que, sem isso, o leitor IFC não carrega. Como o aplicativo só executa os próprios arquivos e recusa qualquer conteúdo da internet, o risco é contido.
 - Navegação e janelas novas são bloqueadas, e permissões negadas, exceto escrever na área de transferência.
 
 **Persistência:** o `localStorage` da origem `coordix://app` fica em `%APPDATA%\COORDIX`. Ele é gravado em disco ao sair (`flushStorageData`). O comportamento é o mesmo da web:
