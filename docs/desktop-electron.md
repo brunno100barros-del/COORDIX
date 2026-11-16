@@ -314,3 +314,38 @@ O leitor IFC (WebAssembly de 32 bits) continua limitado a 4 GB. Um IFC de 1,5 GB
 - numa tentativa intermediária, com a origem na mediana dos centros, 2 elementos do exemplo mudaram de classificação topológica (33 para 31 sólidos válidos, 10 para 8 contatos);
 - a fusão de vértices (0,01 mm) é sensível à origem nesses elementos, por isso a origem padrão voltou ao 1º vértice;
 - o ponto fica registrado para investigação no núcleo geométrico, que não foi alterado.
+
+## 10. Versão 0.5.0-beta (15/11/2026) · Evolução, Etapa 1: Fundação
+
+**Implementado:**
+- **Camada comum de dados** (`coordix-dados.js`):
+  - lê do leitor IFC já aberto de cada modelo, sem reimportar: PropertySets, quantidades (`IfcElementQuantity`), materiais (todas as formas do IFC2X3/IFC4) e classificação;
+  - cada valor guarda a origem (ocorrência ou tipo), o valor bruto e o valor convertido para o SI (m, m², m³, kg), este só quando a unidade é declarada no arquivo;
+  - ausente ≠ vazio ≠ preenchido;
+  - consulta estruturada com filtros combináveis, comparação com unidade (ex.: diâmetro > 100 mm), agrupamento e medição;
+  - a medição não faz dupla contagem: a ocorrência prevalece sobre o tipo, montagem e partes não são somadas juntas, e GUID repetido é sinalizado;
+  - índice construído sob demanda, em lotes, com progresso e cancelamento.
+- **Disciplinas por projeto** (`coordix-disciplinas.js`):
+  - catálogo padrão idêntico às antigas `GROUPS`/`CODE_INFO`;
+  - cadastro em "Projeto e equipe": sigla única, grupo próprio ou herdado de um grupo padrão;
+  - desativar e reativar sem apagar histórico;
+  - copiar de outro projeto;
+  - integrado à detecção pelo nome do arquivo, à disciplina dos modelos, à matriz de testes e à ordem de flexibilidade.
+- **Selecionar / desmarcar tudo** com estado intermediário:
+  - nos testes da matriz (com filtro por disciplina), filtros, regras de pré-classificação e modelos visíveis;
+  - age só sobre os itens visíveis e informa os ocultos;
+  - nunca altera tolerâncias nem parâmetros.
+- **Painel de propriedades:** passa a mostrar Material e Classificação.
+- **`.coordix`:** as disciplinas do projeto vão no arquivo. O formato continua na versão 1, porque os campos novos são aditivos e o arquivo continua abrindo nas versões anteriores.
+
+**Testes** (execução 43784937522):
+- núcleo 101/101, BVH 81/81, comparativo v1, comparação de leitores 12 arquivos;
+- disciplinas 28/28;
+- camada de dados 51/51, dos quais 20 leem `testes/ifc-dados/DADOS-EST.ifc` com o leitor web-ifc real e conferem valores conhecidos de `esperado.json`;
+- recursos 29/29;
+- fumaça 43/43 (desenvolvimento e empacotado);
+- instalador conferido.
+
+**Limitações conhecidas:**
+- Elementos sem geometria gerada pelo leitor não entram na camada de dados. Eles continuam listados à parte na análise.
+- As telas novas (Quantitativos, Auditoria, Assistente) chegam nas etapas 2 a 4.
