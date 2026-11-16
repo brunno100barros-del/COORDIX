@@ -7,7 +7,7 @@ A automação faz a parte repetitiva e o coordenador BIM continua responsável p
 
 <p><img src="marca/coordix-icone.svg" width="72" alt="Símbolo do COORDIX"></p>
 
-> **Status:** protótipo funcional, versão **2.4** (veja o [histórico de versões](#histórico-de-versões)). Roda inteiro no navegador. Os modelos IFC não ficam salvos entre sessões: o projeto pode ser salvo em arquivo `.coordix`, que guarda as referências dos IFCs e os resultados. O backend em Python está planejado (veja o roteiro abaixo).
+> **Status:** protótipo funcional, versão **2.5** (veja o [histórico de versões](#histórico-de-versões)). Roda inteiro no navegador. Os modelos IFC não ficam salvos entre sessões: o projeto pode ser salvo em arquivo `.coordix`, que guarda as referências dos IFCs e os resultados. O backend em Python está planejado (veja o roteiro abaixo).
 
 ## Versões web e desktop
 
@@ -18,12 +18,14 @@ A automação faz a parte repetitiva e o coordenador BIM continua responsável p
 
 | Módulo | Recursos |
 |---|---|
-| Projeto e equipe | Projetos separados, integrantes com cargo, códigos de disciplina e e-mail, indicação do coordenador |
+| Projeto e equipe | Projetos separados, integrantes com cargo, códigos de disciplina e e-mail, indicação do coordenador; cadastro de disciplinas por projeto (sigla, nome e grupo de análise, desativar/reativar, copiar de outro projeto) |
 | Projetos em arquivo | Salvar, salvar como e abrir projetos `.coordix` (equipe, regras, decisões e resultados), com as referências dos IFCs verificadas por assinatura SHA-256 ao reabrir; exclusão com confirmação, sem apagar nenhum arquivo |
 | Modelos IFC | Upload por arrastar e soltar, disciplina detectada pelo código no nome do arquivo (EST, MET, ARQ, SAN, ELE, SCE, PCI, CLI…), leitura de IFC2X3, IFC4 e IFC4X3 (web-ifc 0.0.78), progresso por arquivo e por etapa, esquema IFC e entidades ignoradas na leitura |
+| Dados dos modelos | Camada comum de consulta (`coordix-dados.js`): PropertySets, quantidades, materiais e classificação lidos dos IFCs já abertos, com origem (ocorrência ou tipo), unidade declarada e valor no SI; base das próximas abas (Quantitativos, Auditoria e Assistente IFC) |
+| Seleção | Selecionar/desmarcar tudo com estado intermediário nos testes (com filtro por disciplina), filtros, regras e modelos visíveis; só altera o estado ativo, nunca tolerâncias |
 | Coordenadas | Modelos georreferenciados (UTM) exibidos sem distorção: origem local por projeto e desenho relativo ao centro de cada malha, mantendo a posição relativa entre os IFCs; alerta quando um modelo está em outro sistema de coordenadas |
 | Visualizador | 3D com árvore modelo → pavimento → entidade, isolar, aproximar e snapshot |
-| Propriedades | Aba **Geral** no padrão COORDIX (Disciplina, **Entidade**, ID IFC, Layer, Pavimento, Type) e aba **PropertySets** com quantitativos e propriedades do tipo |
+| Propriedades | Material e classificação do elemento; aba **Geral** no padrão COORDIX (Disciplina, **Entidade**, ID IFC, Layer, Pavimento, Type) e aba **PropertySets** com quantitativos e propriedades do tipo |
 | Regras de análise | Matriz de tolerância com os 21 testes do manual corporativo e 7 testes próprios para Estrutura Metálica (MET) (interferência ou folga, em mm), filtros de exclusão por entidade ou PropertySet, ordem de flexibilidade das disciplinas e tabela de nomes de Entidade editável |
 | Clash detection | Núcleo geométrico próprio (`coordix-geometria.js`): classificação topológica das malhas (sólido válido, aberta, inválida), análise em segundo plano (Web Worker) com progresso real e cancelamento, espessura de interferência rigorosa (exata para peças convexas) ou estimada quando a malha não é sólida, volume de interseção, folga por distância exata, integridade geométrica por elemento, índice espacial (BVH) em cada malha, unidade declarada no IFC e estados de confiabilidade (confirmado, abaixo da tolerância, contato, sem conflito, inconclusivo e incompleto) |
 | Clashes por nível | Resultados agrupados por pavimento, aba separada de **falsos clashes** e alerta de revisão pendente |
@@ -88,6 +90,15 @@ Recursos desenvolvidos e testados primeiro na versão desktop (0.2.0 a 0.4.0) e 
 - Tela "Sobre o COORDIX" e textos da interface sem referência ao Visus.
 - Núcleo geométrico sem alteração. Relatório dos testes: `docs/desktop-electron.md` (branch `desktop-electron`).
 
+### v2.5 · Evolução, Etapa 1: Fundação (15/11/2026)
+Validada primeiro na versão desktop 0.5.0 e trazida para a web após aprovação. Inclui também o leitor IFC por modelo da desktop 0.4.1.
+- **Camada comum de dados:** lê PropertySets, quantidades (`IfcElementQuantity`), materiais e classificação do leitor já aberto, sem reimportar. Cada valor tem origem (ocorrência ou tipo) e unidade; a conversão para o SI só acontece quando a unidade está declarada no IFC. Ausente, vazio e preenchido são diferenciados. Consultas com filtros combináveis e medição sem dupla contagem (tipo, montagem e GUID repetido). Preparação em lotes, com progresso e cancelamento.
+- **Disciplinas por projeto:** catálogo padrão idêntico ao anterior (MET preservada) e cadastro de novas disciplinas, integradas à detecção pelo nome do arquivo, à matriz de testes e à ordem de flexibilidade. Desativar não apaga histórico.
+- **Selecionar / desmarcar tudo** nas listas de testes, filtros, regras e modelos.
+- **Um leitor IFC por modelo:** um arquivo grande não esgota a memória dos demais.
+- Material e classificação no painel de propriedades.
+- Núcleo geométrico sem alteração. Relatório: `docs/desktop-electron.md`, seção 10 (branch `desktop-electron`).
+
 ## Como rodar
 
 O app é estático: basta servir a pasta por HTTP. Abrir o `index.html` direto do disco não funciona, porque o navegador bloqueia o carregamento do `.wasm`.
@@ -107,11 +118,17 @@ Na primeira abertura é carregado um projeto de exemplo, com modelos fictícios 
 index.html                       app (interface, leitura IFC, análise, revisão, BCF)
 coordix-geometria.js             núcleo geométrico (sem dependências; navegador e Node)
 coordix-analise-worker.js        análise de pares em segundo plano (Web Worker com o núcleo geométrico)
+coordix-dados.js                 camada comum de dados dos modelos (propriedades, quantidades, materiais, consultas)
+coordix-disciplinas.js           catálogo padrão e cadastro de disciplinas por projeto
 web-ifc.wasm                     cópia antiga do leitor (0.0.39); o app carrega o leitor 0.0.78 por CDN
 exemplos/                        IFCs fictícios com conflitos planejados
 ferramentas/gerar_ifc_exemplo.py gera os IFCs de exemplo
 ferramentas/gerar_ifc_carga.py   gera os IFCs de carga (pequeno, médio e grande) para medir leitura e análise
 testes/ifc-carga/                IFCs de carga gerados
+ferramentas/gerar_ifc_dados.py   gera o IFC de teste da camada de dados, com valores conhecidos
+testes/ifc-dados/                IFC de teste da camada de dados e valores esperados
+testes/disciplinas.test.js       testes do cadastro de disciplinas
+testes/dados.test.js             testes da camada de dados (a parte com o leitor IFC real exige o pacote web-ifc)
 ferramentas/gerar_simbolo.py     gera o símbolo do COORDIX (SVG)
 marca/                           símbolo, versão com sobrancelha e ícone do aplicativo
 testes/geometria.test.js         suíte de testes geométricos (101 cenários)
@@ -135,6 +152,8 @@ Precisa do Node.js 18 ou superior. Não há dependências para instalar.
 node testes/geometria.test.js    # sai com código 1 se algum cenário falhar
 node testes/comparativo_v1.js
 node testes/bvh.test.js          # equivalência da BVH com o núcleo linear (~1 min)
+node testes/disciplinas.test.js
+node testes/dados.test.js        # com "npm install web-ifc@0.0.78" também lê o IFC de teste
 node testes/desempenho_bvh.js    # tempos medidos na sua máquina
 ```
 

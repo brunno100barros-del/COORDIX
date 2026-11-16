@@ -203,6 +203,8 @@ td input[type=text],td input[type=email],td input[type=number],td select{width:1
 td.tight{width:1%;white-space:nowrap}
 
 /* indicadores: classificação, status e revisão (marca lateral + tinta da cor) */
+.selbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 8px;font-size:12.5px}
+.selbar label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .chip{--c:var(--fake);display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px 0 9px;border-radius:var(--r-1);font:600 var(--fs-xs)/1 var(--font-mono);letter-spacing:.01em;white-space:nowrap;
   color:color-mix(in srgb,var(--c) 78%,var(--ink));background:color-mix(in srgb,var(--c) 12%,transparent);box-shadow:inset var(--bar) 0 0 var(--c)}
 .chip.P1{--c:var(--p1)} .chip.P2{--c:var(--p2)} .chip.P3{--c:var(--p3)} .chip.P4{--c:var(--p4)} .chip.INFO{--c:var(--info)} .chip.FALSO{--c:var(--fake)}
@@ -515,6 +517,8 @@ pre.xml{margin:0;padding:14px;background:var(--surface-2);border:var(--bw) solid
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="coordix-geometria.js"></script>
+<script src="coordix-disciplinas.js"></script>
+<script src="coordix-dados.js"></script>
 <script type="module">
 /* ===================================================================== */
 /*  Dados de referência (Manual Corporativo de Clash Detection + BCF)     */
@@ -529,12 +533,11 @@ const CLASSES = {
 };
 const CLS_ORDER = ["P1","P2","P3","P4","INFO","FALSO"];
 
-const GROUPS = {EST:"Estrutura",MET:"Estrutura Metálica",ARQ:"Arquitetura",SAN:"Hidrossanitário",HVAC:"HVAC",ELE:"Elétrica",PCI:"Incêndio",FORRO:"Forro",MEP:"MEP",EQUIP:"Equipamentos"};
-const CODE_INFO = { // código no nome do arquivo → disciplina
-  EST:["Estrutura","EST"], MET:["Estrutura Metálica","MET"], ARQ:["Arquitetura","ARQ"], SAN:["Hidrossanitário","SAN"], HID:["Hidráulica","SAN"],
-  PCI:["Prevenção e combate a incêndio","PCI"], PSI:["Piscina","SAN"], ELE:["Elétrica","ELE"], SCE:["Cabeamento estruturado","ELE"],
-  SPD:["SPDA","ELE"], SUB:["Subestação","ELE"], CLI:["Climatização","HVAC"], CON:["Climatização","HVAC"], HVAC:["HVAC","HVAC"],
-};
+/* Disciplinas: catálogo padrão (idêntico às antigas GROUPS/CODE_INFO) + cadastro por projeto em coordix-disciplinas.js.
+   GROUPS e CODE_INFO continuam como apelidos do catálogo padrão; a resolução por projeto usa DISC.* */
+const DISC=window.CoordixDisc;
+const GROUPS=DISC.GRUPOS_PADRAO;
+const CODE_INFO=DISC.SIGLAS_PADRAO;
 const DEFAULT_TESTS = [
   [1,"EST","EST",0,"hard","Autodesk + BEP Penn State","Consistência estrutural"],
   [2,"EST","ARQ",5,"hard","Penn State BEP","Compatibilidade geométrica"],
@@ -668,6 +671,7 @@ function defaultSettings(){
     rules:Object.fromEntries(RULES.map(r=>[r.id,{on:true,cls:r.cls}])),
     entityNames:{},
     flexOrder:[...FLEX_ORDER],
+    disciplinas:{extras:[],inativas:[]},
     decisions:{}, // chave par-de-GUIDs → decisão do coordenador
     issueSeq:0,
     created:new Date().toISOString(),
@@ -680,7 +684,8 @@ if(!DB.projects.find(p=>p.id==="exemplo")) DB.projects.unshift(exampleProject())
 for(const p of DB.projects){const d=defaultSettings();for(const k in d) if(p[k]===undefined) p[k]=d[k];
   // acréscimos de versões novas (nada existente é alterado): testes padrão ausentes e siglas novas na ordem de flexibilidade
   for(const t of DEFAULT_TESTS) if(!p.tests.some(x=>x.id===t.id)) p.tests.push({...t});
-  if(!p.flexOrder.includes("MET")){const i=p.flexOrder.indexOf("EST");p.flexOrder.splice(i<0?0:i+1,0,"MET")}}
+  if(!p.flexOrder.includes("MET")){const i=p.flexOrder.indexOf("EST");p.flexOrder.splice(i<0?0:i+1,0,"MET")}
+  DISC.migrar(p);}
 let saveT=0;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(STORE_KEY,JSON.stringify(DB))}catch(e){}if(typeof renderProjFile==="function") renderProjFile()},250)}
 const proj=()=>DB.projects.find(p=>p.id===DB.current)||DB.projects[0];
@@ -709,12 +714,10 @@ function decIfc(s){
           .replace(/\\S\\(.)/g,(m,c)=>String.fromCharCode(c.charCodeAt(0)+128))
           .replace(/\\\\/g,"\\");
 }
-function codeFromFile(name){
-  const up=name.toUpperCase().replace(/\.IFC$/,"");
-  const parts=up.split(/[-_ .]/);
-  for(const p of parts) if(CODE_INFO[p]) return p;
-  return "";
-}
+function codeFromFile(name,P){return DISC.siglaDoArquivo(P||proj(),name)}
+/* disciplina e grupo de um código no projeto (mesmo inativa: rótulos e histórico continuam legíveis) */
+function discInfo(P,code){const d=code?DISC.infoQualquer(P,code):null;return d?{disc:d.nome,group:d.grupo}:{disc:"A definir",group:null}}
+const groupLabel=(P,g)=>DISC.rotuloGrupo(P,g);
 function entityName(cls){const p=proj();return (p.entityNames&&p.entityNames[cls])||DEFAULT_ENTITY_NAMES[cls]||ifcPretty(cls)}
 function memberFor(code){
   if(!code) return null;
@@ -734,6 +737,20 @@ const TYPE_NAME={};
 const vec=v=>{if(!v) return []; if(Array.isArray(v)) return v; const out=[];const n=v.size();for(let i=0;i<n;i++) out.push(v.get(i));return out};
 const val=a=>a==null?null:(typeof a==="object"&&"value" in a)?a.value:a;
 
+/* Um leitor (instância WebAssembly) por modelo: cada instância tem o próprio espaço de memória de até 4 GB.
+   Com um leitor único, um IFC grande ocupava quase todo o espaço e os modelos seguintes falhavam por
+   "memória insuficiente". O leitor do modelo fica aberto para consultar as propriedades e é liberado ao remover. */
+async function newReader(){
+  try{const a=new WEBIFC.IfcAPI();a.SetWasmPath(WEBIFC_BASE,true);
+    await a.Init((path)=> path.endsWith(".wasm") ? WEBIFC_BASE+"web-ifc.wasm" : path, true);return a}
+  catch(e){console.warn("COORDIX: leitor dedicado indisponível; usando o leitor compartilhado",e);return api}
+}
+function releaseReader(m){
+  const A=m.api;if(!A) return;
+  try{if(m.mid!=null) A.CloseModel(m.mid)}catch(e){}
+  if(A!==api){try{A.Dispose()}catch(e){}}
+  m.api=null;
+}
 async function initEngine(){
   try{
     // leitor IFC: web-ifc 0.0.78 (lê IFC2X3, IFC4 e IFC4X3; geometria de curvas, varreduras e conexões
@@ -817,8 +834,9 @@ function projOffset(pid){const P=DB.projects.find(p=>p.id===pid);return P&&Array
 const median=a=>{if(!a.length) return 0;const s=Float64Array.from(a).sort();const h=s.length>>1;return s.length%2?s[h]:(s[h-1]+s[h])/2};
 async function loadIfc(projectId, file, bytes, origem){
   const list=S.models[projectId]||(S.models[projectId]=[]);
-  const code=codeFromFile(file);
-  const m={id:uid(),projectId,file,code,disc:(CODE_INFO[code]||["A definir"])[0],group:(CODE_INFO[code]||[null,null])[1],
+  const DP=DB.projects.find(p=>p.id===projectId)||proj();
+  const code=codeFromFile(file,DP);const di=discInfo(DP,code);
+  const m={id:uid(),projectId,file,code,disc:di.disc,group:di.group,
     status:"lendo",progress:0,elems:[],chunks:[],storeys:[],building:"",visible:true,error:null,size:bytes.byteLength,
     caminho:origem&&origem.caminho||null,sha256:origem&&origem.sha256||null};
   list.push(m);renderAll();
@@ -829,7 +847,8 @@ async function loadIfc(projectId, file, bytes, origem){
     try{const head=new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(4000,bytes.byteLength)));const mm=head.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i);m.schema=mm?mm[1]:""}catch(e){}
     m.stage="abertura do arquivo";
     await loadStage(`Abrindo ${file} (leitura do IFC)`);
-    const mid=api.OpenModel(new Uint8Array(bytes),IFC_LOADER_SETTINGS);
+    m.api=await newReader();
+    const mid=m.api.OpenModel(new Uint8Array(bytes),IFC_LOADER_SETTINGS);
     bytes=null; // o leitor já copiou o arquivo: libera o original (arquivos grandes)
     if(mid<0) throw new Error("o leitor IFC não conseguiu abrir o arquivo");
     m.mid=mid;
@@ -845,13 +864,13 @@ async function loadIfc(projectId, file, bytes, origem){
     renderAll();
     if(projectId===DB.current && list.filter(x=>x.status==="pronto").length===1) fitView();
     linkModelRef(projectId,m);
-  }catch(e){console.error(e);m.status="erro";m.error=`${ifcErrorText(e)} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll();
+  }catch(e){console.error(e);releaseReader(m);m.status="erro";m.error=`${ifcErrorText(e)} — na etapa "${m.stage||"abertura do arquivo"}"${m.schema?" · esquema "+m.schema:""}`;renderAll();
     toast(`Não foi possível ler ${file}: ${m.error}`)}
   return m;
 }
 
 function indexModel(m){
-  const mid=m.mid,T=WEBIFC;
+  const mid=m.mid,T=WEBIFC,api=m.api;
   m.skipped=m.skipped||{};
   const skip=(what,e)=>{m.skipped[what]=(m.skipped[what]||0)+1;if(m.skipped[what]===1) console.warn("COORDIX: "+what+" ignorado",e)};
   const ids=code=>{if(code==null) return [];try{return vec(api.GetLineIDsWithType(mid,code))}catch(e){skip("tipo "+code,e);return []}};
@@ -872,6 +891,10 @@ function indexModel(m){
     const tn=TYPE_NAME[gl.type]||"";if(!/SYSTEM/.test(tn)) return;
     for(const r of refs(l.RelatedObjects)) m.systemOf[val(r)]=decIfc(val(gl.Name))||"";
   });
+  m.stage="materiais e classificação";
+  m.materialOf={};m.classifOf={};
+  each(T.IFCRELASSOCIATESMATERIAL,"IfcRelAssociatesMaterial",l=>{const mt=val(l.RelatingMaterial);for(const r of refs(l.RelatedObjects)) m.materialOf[val(r)]=mt});
+  each(T.IFCRELASSOCIATESCLASSIFICATION,"IfcRelAssociatesClassification",l=>{const c=val(l.RelatingClassification);for(const r of refs(l.RelatedObjects)){const k=val(r);(m.classifOf[k]||(m.classifOf[k]=[])).push(c)}});
   m.stage="layers";
   each(T.IFCPRESENTATIONLAYERASSIGNMENT,"IfcPresentationLayerAssignment",l=>{const n=decIfc(val(l.Name));for(const r of refs(l.AssignedItems)) m.layerOfRep[val(r)]=n});
   m.stage="pavimentos";
@@ -903,6 +926,7 @@ function indexModel(m){
   for(const pid of ids(T.IFCPROJECT)){try{const pl=line(pid);const ua=val(pl.UnitsInContext);if(ua==null) continue;
     const al=line(ua);for(const u of al.Units||[]){const o=plainUnit(val(u));if(o) units.push(o)}}catch(e){skip("IfcUnitAssignment",e)}}
   m.lengthUnit=GEOC.resolveLengthUnit(units);
+  m.unitsRaw=units;m.unidadePlana=plainUnit; // área, volume e massa: usados pela camada de dados (quantidades)
   // referência independente para verificar se o leitor converteu a geometria: maior profundidade de extrusão
   m.maxExtrusionDepth=0;
   {let n=0;for(const id of ids(T.IFCEXTRUDEDAREASOLID)){if(++n>5000) break;try{const d=Number(val(line(id).Depth));if(d>m.maxExtrusionDepth) m.maxExtrusionDepth=d}catch(e){}}}
@@ -917,7 +941,7 @@ function storeyOf(m,eid){
 }
 
 function buildGeometry(m){
-  const mid=m.mid,T=WEBIFC;
+  const mid=m.mid,T=WEBIFC,api=m.api;
   const ids=code=>code==null?[]:vec(api.GetLineIDsWithType(mid,code));
   const perEl=new Map(); // eid → {geoms:[{p,n,i,color}]}
   let origin=null;const cx=[],cy=[],cz=[]; // centros dos elementos (para a origem robusta)
@@ -959,6 +983,8 @@ function buildGeometry(m){
     for(const id of idsC){if(perEl.has(id)||m.unprocessed.some(u=>u.eid===id)) continue;
       try{const l=api.GetLine(mid,id,false);if(val(l.Representation)!=null) m.unprocessed.push({eid:id,reason:"o leitor não gerou malha para a representação"})}catch(e){}}
   }
+  // a malha já foi copiada para o COORDIX: descarta o cache de geometria do leitor (as propriedades continuam disponíveis)
+  try{if(typeof api.ResetCache==="function") api.ResetCache(mid)}catch(e){}
   for(const u of m.unprocessed){try{const l=api.GetLine(mid,u.eid,false);u.guid=val(l.GlobalId)||"";u.cls=TYPE_NAME[l.type]||"";u.name=decIfc(val(l.Name))||""}catch(e){u.guid="";u.cls=""}}
   m.stage="elementos";
   if(!origin){m.empty=true;return}
@@ -1088,7 +1114,10 @@ function boxOf(idxs){const b=new THREE.Box3();for(const i of idxs) b.union(ELEMS
 /* diagnóstico somente leitura (usado pelo teste de fumaça): origem do projeto e maior coordenada dos vértices desenhados */
 window.coordixDiagnostico=()=>{let vMax=0,pMax=0;for(const c of V.root.children){const a=c.geometry&&c.geometry.attributes.position;if(!a) continue;
   for(let k=0;k<a.array.length;k++){const v=Math.abs(a.array[k]);if(v>vMax)vMax=v}pMax=Math.max(pMax,Math.abs(c.position.x),Math.abs(c.position.y),Math.abs(c.position.z))}
-  return {projeto:DB.current,origem:projOffset(DB.current),maiorVertice:vMax,maiorPosicaoMalha:pMax,malhas:V.root.children.length}};
+  const ms=(S.models[DB.current]||[]).filter(m=>m.status==="pronto");
+  const leitores=new Set(ms.map(m=>m.api).filter(Boolean)).size;
+  const psets=ms.map(m=>{for(const i of m.elems){const n=psetsOf(ELEMS[i]).length;if(n) return n}return 0});
+  return {projeto:DB.current,origem:projOffset(DB.current),maiorVertice:vMax,maiorPosicaoMalha:pMax,malhas:V.root.children.length,modelos:ms.length,leitores,psets}};
 function fitView(box){
   if(!box){box=new THREE.Box3();for(const c of V.root.children) if(c.visible) box.expandByObject(c)} // caixa no mundo (malhas relativas ao centro)
   if(box.isEmpty()) return;
@@ -1133,7 +1162,7 @@ function psetsOf(el){
   if(el._psets) return el._psets;
   const m=el.m,out=[];
   const read=(id,fromType)=>{
-    let l;try{l=api.GetLine(m.mid,id,true)}catch(e){return}
+    let l;try{l=m.api.GetLine(m.mid,id,true)}catch(e){return}
     const tn=TYPE_NAME[l.type]||"";
     const name=decIfc(val(l.Name))||tn;
     const props=[];
@@ -1156,9 +1185,66 @@ function psetsOf(el){
   };
   for(const id of m.psetsOf[el.eid]||[]) read(id,false);
   const t=m.typeOf[el.eid];
-  if(t!=null){try{const tl=api.GetLine(m.mid,t,false);for(const r of tl.HasPropertySets||[]) read(val(r),true)}catch(e){}}
+  if(t!=null){try{const tl=m.api.GetLine(m.mid,t,false);for(const r of tl.HasPropertySets||[]) read(val(r),true)}catch(e){}}
   el._psets=out;return out;
 }
+/* ===================================================================== */
+/*  Camada comum de dados (coordix-dados.js): índice por modelo, sob demanda */
+/* ===================================================================== */
+const DADOS=window.CoordixDados;
+const DX={ocupado:null}; // indexação em andamento (uma por vez)
+function fonteDe(m){return {linha:(id,flat)=>m.api.GetLine(m.mid,id,!!flat),nomeTipo:l=>TYPE_NAME[l&&l.type]||"",texto:x=>typeof x==="string"?decIfc(x):x,unidade:id=>m.unidadePlana?m.unidadePlana(id):null}}
+function ctxDe(m){
+  if(!m.dadosCtx) m.dadosCtx={fonte:fonteDe(m),psetsOf:m.psetsOf||{},typeOf:m.typeOf||{},materialOf:m.materialOf||{},classifOf:m.classifOf||{},unidades:DADOS.unidadesDoProjeto(m.unitsRaw),cache:DADOS.novoCache()};
+  return m.dadosCtx;
+}
+/* montagens (IfcRelAggregates entre elementos): pai → partes, para não somar os dois */
+function montagens(m){if(m.eidIdx) return;m.eidIdx=new Map(m.elems.map(i=>[ELEMS[i].eid,i]));m.temPartes=new Set();
+  for(const i of m.elems){const p=m.aggParent&&m.aggParent[ELEMS[i].eid];if(p!=null&&m.eidIdx.has(p)) m.temPartes.add(p)}}
+/* registro de dados de um elemento (lido uma vez e guardado no próprio elemento) */
+function regDe(el){
+  if(el._reg) return el._reg;
+  const m=el.m;montagens(m);let d;try{d=DADOS.dadosDoElemento(ctxDe(m),el.eid)}catch(e){d={conjuntos:[],materiais:[],materialOrigem:null,classificacoes:[],erro:String(e.message||e)}}
+  const pai=m.aggParent?m.aggParent[el.eid]:null;
+  el._reg=Object.assign({idx:el.idx,eid:el.eid,modelo:m.id,pai:pai!=null&&m.eidIdx&&m.eidIdx.has(pai)?pai:null,temPartes:!!(m.temPartes&&m.temPartes.has(el.eid))},d);
+  return el._reg;
+}
+/* campos básicos vêm dos elementos já carregados (nada é copiado) */
+function campoBasico(r,c){const el=ELEMS[r.idx],m=el.m;
+  switch(c){case "arquivo":case "modelo":return m.file;case "disciplina":return el.code||m.code||"";case "grupo":return el.group||"";case "classe":return el.cls;
+    case "entidade":return entityName(el.cls);case "pavimento":return el.storey;case "tipo":return el.typeName||el.objType||"";case "nome":return el.name;
+    case "sistema":return el.system;case "guid":return el.guid;case "tag":return el.tag;case "predefinido":return el.predef;default:return null}}
+/* índice do projeto: lê PropertySets, quantidades, materiais e classificação de todos os elementos dos modelos
+   prontos, em lotes (a interface não trava), com progresso real e cancelamento. Cada modelo é lido uma vez. */
+async function ensureDados(P,{titulo="Preparando os dados dos modelos"}={}){
+  const models=(S.models[P.id]||[]).filter(m=>m.status==="pronto"&&m.api);
+  const faltam=models.filter(m=>!m.dadosProntos);
+  if(faltam.length){
+    if(DX.ocupado){toast("Os dados dos modelos já estão sendo preparados.");return null}
+    const total=faltam.reduce((s,m)=>s+m.elems.length,0);let feito=0,cancel=false;
+    DX.ocupado={cancelar:()=>{cancel=true}};
+    progress.show({title:titulo,stage:"PropertySets, quantidades, materiais e classificação",onCancel:()=>{cancel=true}});
+    try{
+      for(const m of faltam){
+        progress.update({stage:`Lendo ${m.file}`,done:feito,total,unit:"elementos"});
+        const L=m.elems;let t0=performance.now();
+        for(let k=0;k<L.length;k++){
+          regDe(ELEMS[L[k]]);feito++;
+          if(performance.now()-t0>30){progress.update({stage:`Lendo ${m.file}`,done:feito,total,unit:"elementos"});await new Promise(r=>setTimeout(r,0));t0=performance.now();if(cancel) break}
+        }
+        if(cancel) break;
+        m.dadosProntos=true;
+      }
+    }finally{DX.ocupado=null;progress.hide()}
+    if(cancel){toast("Preparação dos dados cancelada. O que já foi lido fica guardado e não será lido de novo.");return null}
+  }
+  const registros=models.flatMap(m=>m.elems.map(i=>regDe(ELEMS[i])));
+  const semGeometria=models.reduce((s,m)=>s+(m.unprocessed||[]).length,0);
+  return {registros,modelos:models.map(m=>m.file),semGeometria};
+}
+function consultarDados(base,consulta){return DADOS.consultar(base.registros,consulta,campoBasico)}
+window.coordixDados={preparar:()=>ensureDados(proj()),consultar:async q=>{const b=await ensureDados(proj());if(!b) return null;const r=consultarDados(b,q);
+  return {consultados:r.consultados,modelos:r.modelos,itens:r.itens.map(x=>ELEMS[x.idx].guid),medida:r.medida&&{grandeza:r.medida.grandeza,unidade:r.medida.unidade,total:r.medida.total,comValor:r.medida.comValor.length,semValor:r.medida.semValor.length,semSI:r.medida.semSI.length,partesDeMontagem:r.medida.partesDeMontagem.length,conflitos:r.medida.conflitos.length,divergencias:r.medida.divergencias.length}}}};
 function fmtVal(v){
   if(v==null) return "";
   if(v==="T"||v===true) return "Sim"; if(v==="F"||v===false) return "Não";
@@ -1168,7 +1254,7 @@ function fmtVal(v){
 function layerOf(el){
   if(el._layer!==undefined) return el._layer;
   let name="";
-  try{const pds=api.GetLine(el.m.mid,el.rep,false);for(const r of pds.Representations||[]){const n=el.m.layerOfRep[val(r)];if(n){name=n;break}}}catch(e){}
+  try{const pds=el.m.api.GetLine(el.m.mid,el.rep,false);for(const r of pds.Representations||[]){const n=el.m.layerOfRep[val(r)];if(n){name=n;break}}}catch(e){}
   el._layer=name;return name;
 }
 function visusFields(el){
@@ -1178,7 +1264,10 @@ function visusFields(el){
   ];
 }
 function extraFields(el){
-  return [["Nome",el.name],["Classe IFC",ifcPretty(el.cls)],["PredefinedType",el.predef],["Sistema",el.system],["Tag",el.tag],
+  const rg=regDe(el);
+  const mat=rg.materiais.length?rg.materiais.join(" / ")+(rg.materialOrigem==="tipo"?" (do tipo)":""):"";
+  const cla=rg.classificacoes.map(c=>[c.sistema,c.codigo,c.nome].filter(Boolean).join(" · ")).join(" / ");
+  return [["Nome",el.name],["Material",mat],["Classificação",cla],["Classe IFC",ifcPretty(el.cls)],["PredefinedType",el.predef],["Sistema",el.system],["Tag",el.tag],
     ["Dimensões (mm)",el.size.map(v=>fmt(v)).join(" × ")],
     ["Integridade geométrica",el.geoIntegrity==="parcial"?`parcial — ${(el.geoFailures||[]).length} representação(ões) não lida(s)`:el.geoIntegrity==="completa"?"completa":""],
     ["Topologia da malha",(el._solid||el._topo)?({solido_valido:"sólido válido",aberta:"malha aberta",invalida:"malha inválida",superficie:"superfície sem volume"}[el._solid?el._solid.topology:el._topo]||(el._solid?el._solid.topology:el._topo)):""]];
@@ -1308,7 +1397,7 @@ async function runAnalysis(){
         if(r.state==="abaixo_tolerancia"){below++;continue}
         // confirmado, inconclusivo e incompleto entram na lista: nunca são tratados como ausência de conflito
         const value=r.value==null?null:Math.round(r.value*1e4)/10;
-        const item={id:key,key:pairKey(a,b),a:a.idx,b:b.idx,test:t.id,testName:`${GROUPS[t.a]} × ${GROUPS[t.b]}`,kind:t.kind,tol:t.tol,value,center:r.center,
+        const item={id:key,key:pairKey(a,b),a:a.idx,b:b.idx,test:t.id,testName:`${groupLabel(P,t.a)} × ${groupLabel(P,t.b)}`,kind:t.kind,tol:t.tol,value,center:r.center,
           geo:{state:r.state,lb:r.lb,ub:r.ub,volume:r.volume,extent:r.extent,quality:r.quality,flags:r.flags,method:r.method,metricQuality:r.metricQuality,evidence:r.evidence,bounds:r.bounds}};
         // consolidação: o mesmo par em vários testes mantém o resultado mais relevante e confiável
         // (confirmado > inconclusivo/incompleto); um inconclusivo nunca é trocado por ausência
@@ -1510,7 +1599,7 @@ function renderAll(){
   // tira o visualizador antes de reescrever a área
   const viewer=$("#viewer");if(viewer.parentElement!==document.body){document.body.appendChild(viewer);viewer.hidden=true}
   const fn={projeto:viewProjeto,modelos:viewModelos,visualizador:viewVisualizador,regras:viewRegras,clashes:viewClashes,revisao:viewRevisao,issues:viewIssues,bcf:viewBcf}[v]||viewProjeto;
-  main.innerHTML=fn();
+  main.innerHTML=fn();marcarIndeterminados();
   if(v==="visualizador"){mountViewer($("#vslot"));if(V.pair){V.pair=null;clearHL();clearIsolation();$("#vlegend").hidden=true;setTimeout(()=>fitView(),30);setStatus("Clique em um elemento para ver as propriedades.")}renderTree();renderProps()}
   if(v==="revisao"){mountViewer($("#rslot"));renderQueue();renderReviewCard(true)}
 }
@@ -1561,13 +1650,51 @@ function viewProjeto(){
       </table></div>
       <p class="muted" style="font-size:12.5px;margin:10px 0 0">O responsável de cada clash é sugerido pelo código de disciplina do modelo que deve se adaptar (ordem de flexibilidade em Regras). </p>
     </div>
+    ${viewDisciplinas(P)}
   </section>`;
 }
+/* ---------- cadastro de disciplinas (por projeto) ---------- */
+function discEmUso(P,sigla){
+  return (S.models[P.id]||[]).some(m=>m.code===sigla)||(P.modelos||[]).some(r=>r.codigo===sigla)
+    ||P.tests.some(t=>t.a===sigla||t.b===sigla)||P.team.some(m=>(m.codes||"").toUpperCase().split(/[,; ]+/).includes(sigla));
+}
+function viewDisciplinas(P){
+  const L=DISC.lista(P),ativas=L.filter(d=>d.ativa).length,extras=L.filter(d=>!d.padrao);
+  const gruposPadrao=Object.entries(DISC.GRUPOS_PADRAO).filter(([g])=>!DISC.GRUPOS_DERIVADOS.has(g));
+  const outros=DB.projects.filter(o=>o.id!==P.id&&o.disciplinas&&(o.disciplinas.extras||[]).length);
+  const grupoSel=(d,dis)=>`<select data-dx="grupo" ${dis?"disabled":""} aria-label="Grupo de análise">
+      <option value="${esc(d.sigla)}" ${d.grupo===d.sigla?"selected":""}>Grupo próprio</option>
+      ${gruposPadrao.map(([g,r])=>`<option value="${g}" ${d.grupo===g?"selected":""}>Herda testes de ${esc(r)}</option>`).join("")}</select>`;
+  return `<div class="panel stack" id="discPanel">
+    <div class="row" style="justify-content:space-between"><h2>Disciplinas do projeto</h2><span class="muted num" style="font-size:12.5px">${ativas} ativas · ${extras.length} cadastradas neste projeto</span></div>
+    <p class="muted" style="font-size:12.5px;margin:0">A sigla é lida no nome do arquivo IFC (ex.: PROJ-<b>DRN</b>-R00.ifc). Cada disciplina tem um <b>grupo de análise</b>: o grupo próprio aparece na matriz de testes como uma disciplina nova (sem testes até você criá-los); "herda testes" faz a disciplina entrar nos testes do grupo escolhido. As disciplinas padrão não podem ser apagadas, só desativadas neste projeto. Desativar não apaga modelos, clashes, decisões nem histórico.</p>
+    <div class="tbl-wrap" style="max-height:420px;overflow:auto"><table>
+      <thead><tr><th>Sigla</th><th>Disciplina</th><th>Grupo de análise</th><th>Origem</th><th>Situação</th><th></th></tr></thead>
+      <tbody>${L.map(d=>{const uso=!d.padrao&&discEmUso(P,d.sigla);return `<tr data-disc-row="${esc(d.sigla)}">
+        <td class="mono tight">${d.padrao?esc(d.sigla):`<input type="text" data-dx="sigla" value="${esc(d.sigla)}" maxlength="6" style="width:84px" ${uso?'disabled title="Sigla em uso: só o nome pode ser alterado"':""} aria-label="Sigla">`}</td>
+        <td>${d.padrao?esc(d.nome):`<input type="text" data-dx="nome" value="${esc(d.nome)}" aria-label="Nome da disciplina">`}</td>
+        <td style="font-size:12.5px">${d.padrao?esc(groupLabel(P,d.grupo)):grupoSel(d,uso)}</td>
+        <td style="font-size:12.5px" class="muted">${d.padrao?"Padrão":"Deste projeto"}</td>
+        <td class="tight"><span class="chip ${d.ativa?"ok":"outline"}">${d.ativa?"Ativa":"Inativa"}</span></td>
+        <td class="tight"><button class="btn small ghost" data-disc-toggle="${esc(d.sigla)}">${d.ativa?"Desativar":"Reativar"}</button></td></tr>`}).join("")}</tbody>
+    </table></div>
+    <div class="row" style="gap:6px;align-items:flex-end;flex-wrap:wrap">
+      <label class="fld" style="width:110px">Sigla<input type="text" id="dSig" maxlength="6" placeholder="ex.: DRN" autocomplete="off"></label>
+      <label class="fld" style="flex:1 1 180px">Nome<input type="text" id="dNome" placeholder="ex.: Drenagem" autocomplete="off"></label>
+      <label class="fld" style="flex:1 1 200px">Grupo de análise<select id="dGrupo"><option value="">Grupo próprio</option>${gruposPadrao.map(([g,r])=>`<option value="${g}">Herda testes de ${esc(r)}</option>`).join("")}</select></label>
+      <button class="btn small primary" id="addDisc">+ Adicionar disciplina</button>
+    </div>
+    <div id="discErr" class="muted" role="alert" style="font-size:12.5px;color:var(--p1)"></div>
+    ${outros.length?`<div class="row" style="gap:6px"><span class="muted" style="font-size:12.5px">Copiar as disciplinas cadastradas em</span><select id="copyDiscFrom" style="width:auto">${outros.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join("")}</select><button class="btn small" id="copyDisc">Copiar</button></div>`:""}
+  </div>`;
+}
+/* depois de mudar o cadastro: modelos do projeto com sigla agora reconhecida/alterada recebem disciplina e grupo */
+function discRefresh(P){for(const m of S.models[P.id]||[]){const di=discInfo(P,m.code);if(m.disc!==di.disc||m.group!==di.group) setModelCode(P,m,m.code)}save();renderAll()}
 
 /* ---------- 2. Modelos ---------- */
 function viewModelos(){
   const P=proj();const ms=S.models[P.id]||[];
-  const discOpts=(cur)=>Object.entries(CODE_INFO).map(([k,v])=>`<option value="${k}" ${k===cur?"selected":""}>${k} — ${esc(v[0])}</option>`).join("")+`<option value="" ${!cur?"selected":""}>A definir</option>`;
+  const discOpts=(cur)=>DISC.lista(P).filter(d=>d.ativa||d.sigla===cur).map(d=>`<option value="${d.sigla}" ${d.sigla===cur?"selected":""}>${d.sigla} — ${esc(d.nome)}${d.ativa?"":" (inativa)"}</option>`).join("")+`<option value="" ${!cur?"selected":""}>A definir</option>`;
   return `<section class="view stack">
     <div><h1>Modelos IFC</h1><p class="lede">Envie um arquivo por disciplina. A disciplina é lida do código no nome do arquivo (ex.: PROJ-<b>SAN</b>-R00.ifc) e pode ser ajustada.</p></div>
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="Enviar arquivos IFC">
@@ -1578,6 +1705,7 @@ function viewModelos(){
     ${engineError?`<div class="alert"><div class="grow"><b>O motor IFC não carregou.</b> ${esc(engineError.message||engineError)}</div></div>`:""}
     <div class="panel">
       ${ms.length?`<div class="tbl-wrap"><table>
+        ${ms.filter(m=>m.status==="pronto").length>1?`<caption style="caption-side:top;text-align:left;padding:8px 10px 0">${selBar("modelos",P)}</caption>`:""}
         <thead><tr><th>Arquivo</th><th>Disciplina</th><th>Elementos</th><th>Pavimentos</th><th>Situação</th><th>Visível</th><th></th></tr></thead>
         <tbody>${ms.map(m=>`<tr data-model="${m.id}">
           <td><div style="font-weight:500">${esc(m.file)}</div><div class="muted mono">${fmt(m.size/1024)} kB${P.example?" · exemplo":""}</div></td>
@@ -1600,11 +1728,39 @@ function viewVisualizador(){
     <aside class="vside right"><div id="props"></div></aside>
   </div></section>`;
 }
+/* ---------- seleção múltipla: selecionar tudo / desmarcar tudo ----------
+   Age só sobre os itens VISÍVEIS (respeita o filtro da lista) e só sobre o estado ativo/visível:
+   tolerâncias, classes e parâmetros nunca mudam. Itens ocultos pelo filtro são informados. */
+const SEL={
+  testes:{rotulo:"testes",itens:P=>{const f=S.ui.testFiltro||"";return P.tests.filter(t=>!f||t.a===f||t.b===f)},total:P=>P.tests.length,on:x=>x.on,set:(x,v)=>{x.on=v}},
+  filtros:{rotulo:"filtros",itens:P=>P.filters,total:P=>P.filters.length,on:x=>x.on,set:(x,v)=>{x.on=v}},
+  regras:{rotulo:"regras",itens:P=>RULES.filter(r=>r.id!=="r_def").map(r=>{const c=P.rules[r.id]||(P.rules[r.id]={on:true,cls:r.cls});return c}),total:P=>RULES.length-1,on:x=>x.on!==false,set:(x,v)=>{x.on=v}},
+  modelos:{rotulo:"modelos visíveis",itens:P=>(S.models[P.id]||[]).filter(m=>m.status==="pronto"),total:P=>(S.models[P.id]||[]).filter(m=>m.status==="pronto").length,on:m=>m.visible,set:(m,v)=>{m.visible=v;for(const c of m.chunks) c.visible=v;V.dirty=true},sessao:true},
+};
+function selBar(grupo,P,{compacto=false}={}){
+  const g=SEL[grupo],it=g.itens(P),n=it.filter(g.on).length,ocultos=g.total(P)-it.length;
+  if(!it.length) return "";
+  const st=n===0?"":n===it.length?"checked":"";
+  return `<div class="selbar" data-selgrp="${grupo}"><label><input type="checkbox" data-selall="${grupo}" ${st} data-ind="${n>0&&n<it.length?1:0}" aria-label="Selecionar todos os ${g.rotulo}"><span class="num">${n} de ${it.length}</span></label>
+    <button class="btn small ghost" type="button" data-selcmd="1" data-selgrp="${grupo}">Selecionar tudo</button><button class="btn small ghost" type="button" data-selcmd="0" data-selgrp="${grupo}">Desmarcar tudo</button>
+    ${ocultos&&!compacto?`<span class="muted">${ocultos} oculto(s) pelo filtro não são alterados</span>`:""}</div>`;
+}
+function aplicarSel(grupo,v){
+  const P=proj(),g=SEL[grupo],it=g.itens(P);let mud=0;
+  for(const x of it) if(!!g.on(x)!==v){g.set(x,v);mud++}
+  const ocultos=g.total(P)-it.length;
+  if(!g.sessao) save();
+  renderAll();if(DB.view==="visualizador") renderTree();
+  toast(`${mud} ${g.rotulo} ${v?"selecionado(s)":"desmarcado(s)"}${ocultos?`; ${ocultos} oculto(s) pelo filtro não foram alterados`:""}.`);
+}
+/* atualiza só a barra de seleção do grupo (depois de marcar/desmarcar um item individual) */
+function refreshSel(grupo){const P=proj();for(const el of document.querySelectorAll(`.selbar[data-selgrp="${grupo}"]`)){const h=selBar(grupo,P,{compacto:!!el.closest("#tree")});if(h) el.outerHTML=h}marcarIndeterminados()}
+function marcarIndeterminados(){for(const c of document.querySelectorAll("[data-selall][data-ind='1']")) c.indeterminate=true}
 function renderTree(){
   const P=proj();const ms=(S.models[P.id]||[]).filter(m=>m.status==="pronto");const host=$("#tree");if(!host) return;
   if(!ms.length){host.innerHTML=`<div class="empty" style="margin:12px">Nenhum modelo carregado. <button class="btn small" data-nav="modelos" style="margin-top:8px">Enviar IFC</button></div>`;return}
   const open=S.ui.treeOpen;
-  host.innerHTML=`<ul class="tree">${ms.map(m=>{
+  host.innerHTML=(ms.length>1?`<div style="padding:8px 10px 0">${selBar("modelos",P,{compacto:true})}</div>`:"")+`<ul class="tree">${ms.map(m=>{
     const byStorey=new Map();for(const i of m.elems){const e=ELEMS[i];const s=byStorey.get(e.storey)||new Map();const k=e.cls;s.set(k,[...(s.get(k)||[]),i]);byStorey.set(e.storey,s)}
     const order=[...byStorey.keys()].sort((a,b)=>levelRank(a)-levelRank(b));
     const mk=m.id;const mo=open[mk]!==false;
@@ -1612,6 +1768,7 @@ function renderTree(){
       ${mo?`<ul>${order.map(st=>{const sk=mk+"|"+st;const so=open[sk]===true;const groups=byStorey.get(st);const all=[...groups.values()].flat();
         return `<li><div class="node" data-toggle="${esc(sk)}"><span class="caret">${so?"▾":"▸"}</span><span class="lbl">${esc(st)}</span><span class="ct">${all.length}</span><button class="btn small ghost" data-sel="${all.join(",")}" title="Selecionar pavimento" style="padding:0 4px">◎</button></div>
         ${so?`<ul>${[...groups.entries()].sort((a,b)=>entityName(a[0]).localeCompare(entityName(b[0]))).map(([cls,ids])=>`<li><div class="node" data-sel="${ids.join(",")}"><span class="caret"></span><span class="lbl" title="${esc(ifcPretty(cls))}">${esc(entityName(cls))}</span><span class="ct">${ids.length}</span></div></li>`).join("")}</ul>`:""}</li>`}).join("")}</ul>`:""}</li>`}).join("")}</ul>`;
+  marcarIndeterminados();
 }
 function propsTable(rows){return `<table class="props"><tbody>${rows.filter(r=>r[1]!=null&&r[1]!=="").map(([k,v,cls])=>`<tr${k==="Entidade"?' class="hl"':""}><td>${esc(k)}</td><td class="${cls||""}">${esc(v)}</td></tr>`).join("")}</tbody></table>`}
 function renderProps(){
@@ -1642,7 +1799,8 @@ function renderProps(){
 /* ---------- 4. Regras ---------- */
 function viewRegras(){
   const P=proj();
-  const groupOpts=(cur)=>Object.entries(GROUPS).map(([k,v])=>`<option value="${k}" ${k===cur?"selected":""}>${v}</option>`).join("");
+  const GA=DISC.grupos(P,true);
+  const groupOpts=(cur)=>Object.entries(GA).map(([k,v])=>`<option value="${k}" ${k===cur?"selected":""}>${esc(v)}</option>`).join("")+(cur&&!GA[cur]?`<option value="${esc(cur)}" selected>${esc(groupLabel(P,cur))} (inativa)</option>`:"");
   const loadedClasses=[...new Set((S.models[P.id]||[]).flatMap(m=>m.elems.map(i=>ELEMS[i].cls)))].sort((a,b)=>entityName(a).localeCompare(entityName(b)));
   const psetNames=[...new Set((S.models[P.id]||[]).flatMap(m=>m.elems.slice(0,4000).flatMap(i=>psetsOf(ELEMS[i]).map(p=>p.name))))].sort();
   return `<section class="view stack">
@@ -1650,9 +1808,12 @@ function viewRegras(){
 
     <div class="panel">
       <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2>Matriz de tolerância</h2><div class="row"><button class="btn small" id="addTest">+ Teste</button><button class="btn small primary" data-run>Executar análise</button></div></div>
+      <div class="row" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">${selBar("testes",P)}
+        <label class="row" style="gap:6px;font-size:12.5px;margin:0 0 8px"><span class="muted">Mostrar testes de</span><select id="testFiltro" style="width:auto">
+          <option value="">todas as disciplinas</option>${[...new Set(P.tests.flatMap(t=>[t.a,t.b]))].map(g=>`<option value="${esc(g)}" ${S.ui.testFiltro===g?"selected":""}>${esc(groupLabel(P,g))}</option>`).join("")}</select></label></div>
       <div class="tbl-wrap"><table>
         <thead><tr><th></th><th>Ordem</th><th>Disciplina A</th><th></th><th>Disciplina B</th><th>Tipo</th><th>Tolerância (mm)</th><th>Fonte</th><th>Justificativa</th></tr></thead>
-        <tbody>${P.tests.sort((a,b)=>a.ordem-b.ordem).map(t=>`<tr data-test="${t.id}">
+        <tbody>${P.tests.sort((a,b)=>a.ordem-b.ordem).filter(t=>!S.ui.testFiltro||t.a===S.ui.testFiltro||t.b===S.ui.testFiltro).map(t=>`<tr data-test="${t.id}">
           <td class="tight"><input type="checkbox" data-tf="on" ${t.on?"checked":""} aria-label="Ativo"></td>
           <td class="num tight">${t.ordem}</td>
           <td><select data-tf="a">${groupOpts(t.a)}</select></td><td class="muted tight">×</td>
@@ -1667,6 +1828,7 @@ function viewRegras(){
       <div class="panel stack">
         <div class="row" style="justify-content:space-between"><h2>Filtros de exclusão</h2><button class="btn small" id="addFilter">+ Filtro</button></div>
         <p class="muted" style="font-size:12.5px;margin:0">Elementos que atendem a um filtro ativo ficam fora da análise. Também dá para criar um filtro direto do painel de PropertySets no visualizador.</p>
+        ${P.filters.length>1?selBar("filtros",P):""}
         ${P.filters.length?P.filters.map(f=>`<div class="row" data-filter="${f.id}" style="gap:6px;padding:8px;border:1px solid var(--line);border-radius:6px">
           <input type="checkbox" data-ff="on" ${f.on?"checked":""} aria-label="Ativo">
           <select data-ff="kind" style="width:120px"><option value="prop" ${f.kind==="prop"?"selected":""}>PropertySet</option><option value="entity" ${f.kind==="entity"?"selected":""}>Entidade</option></select>
@@ -1690,6 +1852,7 @@ function viewRegras(){
 
     <div class="panel">
       <h2>Regras de pré-classificação</h2>
+      ${selBar("regras",P)}
       <p class="muted" style="font-size:12.5px;margin:0 0 10px">Avaliadas de cima para baixo; a primeira que se aplica define a sugestão. Baseadas nos critérios P1–P4 e INFO do manual e no padrão do seu BCF. Toda sugestão passa pela sua revisão.</p>
       <div class="tbl-wrap"><table><thead><tr><th></th><th>Condição</th><th>Sugere</th><th>Motivo exibido ao coordenador</th></tr></thead>
       <tbody>${RULES.map(r=>{const cfg=P.rules[r.id]||{on:true,cls:r.cls};return `<tr data-rule="${r.id}"><td class="tight"><input type="checkbox" data-rf="on" ${cfg.on?"checked":""} ${r.id==="r_def"?"disabled":""} aria-label="Ativa"></td>
@@ -1995,6 +2158,15 @@ document.addEventListener("click",e=>{
   const lk=t.closest("[data-link]");if(lk){linkedAction(lk.dataset.link,+lk.dataset.i);return}
   if(t.closest("#newProjectBtn")){toggleProjMenu(false);const p={id:uid(),name:"Novo projeto",desc:"",team:[{id:uid(),name:"",role:"Coordenador BIM",codes:"",email:"",coord:true}],...defaultSettings()};DB.projects.push(p);switchProject(p.id);go("projeto");setTimeout(()=>$("#pName")?.select(),30);return}
   if(t.closest("#delProject")){excluirProjeto();return}
+  const sc=t.closest("[data-selcmd]");if(sc){aplicarSel(sc.dataset.selgrp,sc.dataset.selcmd==="1");return}
+  if(t.closest("#addDisc")){const P=proj();const r=DISC.adicionar(P,{sigla:$("#dSig").value,nome:$("#dNome").value,grupo:$("#dGrupo").value||undefined});
+    if(!r.ok){$("#discErr").textContent=r.erros.join(" ");return}
+    // arquivos já carregados sem disciplina cuja sigla agora existe passam a ser reconhecidos
+    for(const m of S.models[P.id]||[]) if(!m.code&&codeFromFile(m.file,P)===r.disciplina.sigla){setModelCode(P,m,r.disciplina.sigla);const ref=(P.modelos||[]).find(x=>x.sha256===m.sha256&&x.arquivo===m.file);if(ref) ref.codigo=m.code}
+    toast(`Disciplina ${r.disciplina.sigla} — ${r.disciplina.nome} cadastrada neste projeto.`);discRefresh(P);return}
+  const dtg=t.closest("[data-disc-toggle]");if(dtg){const P=proj();const sg=dtg.dataset.discToggle;const d=DISC.infoQualquer(P,sg);DISC.definirAtiva(P,sg,!d.ativa);
+    toast(d.ativa?`${sg} desativada: não será mais detectada nem oferecida em itens novos; modelos e resultados existentes foram preservados.`:`${sg} reativada.`);discRefresh(P);return}
+  if(t.closest("#copyDisc")){const P=proj();const o=DB.projects.find(x=>x.id===$("#copyDiscFrom").value);const n=o?DISC.copiarDe(P,o):0;toast(n?`${n} disciplina(s) copiada(s).`:"Nenhuma disciplina nova para copiar (siglas já existentes são mantidas).");discRefresh(P);return}
   if(t.closest("#addMember")){proj().team.push({id:uid(),name:"",role:"",codes:"",email:""});save();renderAll();return}
   const dm=t.closest("[data-del-member]");if(dm){const P=proj();P.team=P.team.filter(m=>m.id!==dm.dataset.delMember);save();renderAll();return}
   if(t.closest("#drop")){$("#fileInput").click();return}
@@ -2031,12 +2203,18 @@ document.addEventListener("change",e=>{
   if(t.id==="projectSelect"){switchProject(t.value);return}
   if(t.id==="pName"){P.name=t.value.trim()||"Projeto sem nome";save();renderNav();return}
   if(t.id==="pDesc"){P.desc=t.value;save();return}
+  if(t.dataset.selall){aplicarSel(t.dataset.selall,t.checked);return}
+  if(t.id==="testFiltro"){S.ui.testFiltro=t.value;renderAll();return}
+  const dr=t.closest("tr[data-disc-row]");if(dr&&t.dataset.dx){const sg=dr.dataset.discRow;const r=DISC.editar(P,sg,{[t.dataset.dx]:t.value},discEmUso(P,sg));
+    if(!r.ok){toast(r.erros.join(" "));renderAll();return}
+    if(t.dataset.dx==="sigla"&&r.disciplina.sigla!==sg) for(const m of S.models[P.id]||[]) if(codeFromFile(m.file,P)===r.disciplina.sigla&&!m.code) setModelCode(P,m,r.disciplina.sigla);
+    discRefresh(P);return}
   const tr=t.closest("tr[data-mid]");if(tr){const m=P.team.find(x=>x.id===tr.dataset.mid);const f=t.dataset.f;if(f==="coord"){P.team.forEach(x=>x.coord=false);m.coord=true}else m[f]=t.value;save();reassignResp();return}
-  if(t.dataset.disc){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.disc);const code=t.value;m.code=code;{const r=(P.modelos||[]).find(x=>x.sha256===m.sha256&&x.arquivo===m.file);if(r) r.codigo=code}m.disc=(CODE_INFO[code]||["A definir"])[0];m.group=(CODE_INFO[code]||[null,null])[1];for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}toast("Disciplina atualizada. Execute a análise de novo para aplicar.");return}
-  if(t.dataset.vis){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.vis);m.visible=t.checked;for(const c of m.chunks) c.visible=m.visible;V.dirty=true;return}
-  const tt=t.closest("tr[data-test]");if(tt){const x=P.tests.find(y=>y.id===tt.dataset.test);const f=t.dataset.tf;x[f]=f==="on"?t.checked:f==="tol"?Math.max(0,+t.value||0):t.value;save();return}
-  const ff=t.closest("[data-filter]");if(ff){const x=P.filters.find(y=>y.id===ff.dataset.filter);const f=t.dataset.ff;x[f]=f==="on"?t.checked:t.value;if(f==="kind"&&x.kind==="entity"&&!x.cls) x.cls=Object.keys(DEFAULT_ENTITY_NAMES)[0];save();if(f==="kind"||f==="op") renderAll();return}
-  const rr=t.closest("tr[data-rule]");if(rr){const id=rr.dataset.rule;const cfg=P.rules[id]||(P.rules[id]={on:true,cls:RULES.find(r=>r.id===id).cls});if(t.dataset.rf==="on") cfg.on=t.checked; else cfg.cls=t.value;save();return}
+  if(t.dataset.disc){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.disc);const code=t.value;m.code=code;{const r=(P.modelos||[]).find(x=>x.sha256===m.sha256&&x.arquivo===m.file);if(r) r.codigo=code}{const di=discInfo(P,code);m.disc=di.disc;m.group=di.group}for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}toast("Disciplina atualizada. Execute a análise de novo para aplicar.");return}
+  if(t.dataset.vis){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.vis);m.visible=t.checked;for(const c of m.chunks) c.visible=m.visible;V.dirty=true;for(const o of document.querySelectorAll(`[data-vis="${m.id}"]`)) o.checked=m.visible;refreshSel("modelos");return}
+  const tt=t.closest("tr[data-test]");if(tt){const x=P.tests.find(y=>y.id===tt.dataset.test);const f=t.dataset.tf;x[f]=f==="on"?t.checked:f==="tol"?Math.max(0,+t.value||0):t.value;save();if(f==="on") refreshSel("testes");return}
+  const ff=t.closest("[data-filter]");if(ff){const x=P.filters.find(y=>y.id===ff.dataset.filter);const f=t.dataset.ff;x[f]=f==="on"?t.checked:t.value;if(f==="kind"&&x.kind==="entity"&&!x.cls) x.cls=Object.keys(DEFAULT_ENTITY_NAMES)[0];save();if(f==="on") refreshSel("filtros");if(f==="kind"||f==="op") renderAll();return}
+  const rr=t.closest("tr[data-rule]");if(rr){const id=rr.dataset.rule;const cfg=P.rules[id]||(P.rules[id]={on:true,cls:RULES.find(r=>r.id===id).cls});if(t.dataset.rf==="on") cfg.on=t.checked; else cfg.cls=t.value;save();if(t.dataset.rf==="on") refreshSel("regras");return}
   if(t.dataset.ent){P.entityNames[t.dataset.ent]=t.value.trim();save();return}
   if(t.dataset.status){const c=currentClashes().find(x=>x.id===t.dataset.status);const old=c.status;c.status=t.value;logHist(c,`Status: ${old} → ${c.status}`);persistDecision(c);return}
   if(t.id==="bcfSel"){S.ui.bcfSel=t.value;renderAll();return}
@@ -2087,7 +2265,7 @@ function removeModel(id){
   forgetAnalysisMeshes(m.elems);
   unlinkModelRef(P,m); // remover do projeto ≠ apagar o arquivo: o IFC no disco nunca é tocado
   for(const i of m.elems){ELEMS[i].geoms=[];ELEMS[i]._solid=null;ELEMS[i]._topo=null}
-  try{if(m.mid!=null) api.CloseModel(m.mid)}catch(e){}
+  releaseReader(m); // fecha o modelo e libera a memória do leitor dele
   S.models[P.id]=list.filter(x=>x!==m);
   if(!S.models[P.id].length&&P.origemLocal){delete P.origemLocal;save()} // sem modelos: o próximo IFC define a nova origem do projeto
   S.clashes[P.id]=(S.clashes[P.id]||[]).filter(c=>ELEMS[c.a].model!==id&&ELEMS[c.b].model!==id);
@@ -2172,6 +2350,7 @@ function completeProject(p){ // mesmos acréscimos aplicados aos projetos salvos
   const d=defaultSettings();for(const k in d) if(p[k]===undefined) p[k]=d[k];
   for(const t of DEFAULT_TESTS) if(!p.tests.some(x=>x.id===t.id)) p.tests.push({...t});
   if(!p.flexOrder.includes("MET")){const i=p.flexOrder.indexOf("EST");p.flexOrder.splice(i<0?0:i+1,0,"MET")}
+  DISC.migrar(p);
   p.modelos=p.modelos||[];return p;
 }
 function confirmDialog({title,body,actions}){
@@ -2254,7 +2433,7 @@ async function carregarVinculados(P,refs){
   progress.hide();save();renderAll();
   if(n) await reanalisarComDecisoes(P);
 }
-function setModelCode(P,m,code){m.code=code;m.disc=(CODE_INFO[code]||["A definir"])[0];m.group=(CODE_INFO[code]||[null,null])[1];for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}}
+function setModelCode(P,m,code){m.code=code;{const di=discInfo(P,code);m.disc=di.disc;m.group=di.group}for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}}
 async function reanalisarComDecisoes(P){
   if(DB.current!==P.id) return;
   await runAnalysis(); // as decisões salvas (por par de GUIDs) são reaplicadas pela própria análise
@@ -2330,7 +2509,7 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#projMenu").hidden){toggleProjMenu(false);$("#projMenuBtn").focus()}});
 
 /* ---------- sobre o COORDIX ---------- */
-const WEB_VERSION="2.4"; // versão da interface web (main); o desktop informa a própria versão
+const WEB_VERSION="2.5"; // versão da interface web (main); o desktop informa a própria versão
 async function openAbout(){
   let rows=[["Edição","COORDIX Web"],["Versão",WEB_VERSION]];
   if(window.coordixDesktop&&window.coordixDesktop.info){

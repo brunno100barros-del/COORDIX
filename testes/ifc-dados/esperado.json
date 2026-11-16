@@ -1,0 +1,60 @@
+{
+ "guids": {
+  "V1": "19gfyBdnHVpfGyTBMNRqHR",
+  "V2": "1x6x6qItTP_Bbm4VfkHwrE",
+  "P1": "3NOLJKv1LKxhbaKNyLBqbf",
+  "W1": "0wOvrl_RnKjvrNMg9jO5Mp",
+  "W2": "2cqNiKtOzOovko$tVhHMWb",
+  "A1": "3mi8jkiO5QS8jSaE9F9Riw",
+  "M1": "3DYxKGbY9MD8c55mPJT0CG",
+  "M2": "2_JY$HSJvV5xUY70nRft6w",
+  "T1": "1U$D2eSUTQRhDifK8ugiwD",
+  "T2": "3H7b11D1nJrvhFlJg8_jZr",
+  "C1": "1TG0e0ZpHMJ84PdaegTFM8",
+  "S1": "12pSlLb1rLvuyS7HW$AftL"
+ },
+ "netVolume_total_m3": 1.01,
+ "netVolume_origem": {
+  "elemento": 4,
+  "tipo": 1
+ },
+ "divergencias_tipo": [
+  "P1"
+ ],
+ "montagem_nao_somada": [
+  "A1"
+ ],
+ "comprimento_V1_m": 5.0,
+ "comprimento_C1_m": 2.5,
+ "area_W1_m2": 12.5,
+ "massa_S1_kg": 250.0,
+ "material": {
+  "V1": [
+   "Concreto C30"
+  ],
+  "V2": [
+   "Concreto C40"
+  ],
+  "P1": [
+   "Concreto C30"
+  ],
+  "W2": []
+ },
+ "material_origem": {
+  "V1": "elemento",
+  "V2": "tipo",
+  "P1": "elemento"
+ },
+ "classificacao_W1": {
+  "sistema": "NBR 15965",
+  "codigo": "3E.01.20.10",
+  "nome": "Parede de vedação"
+ },
+ "tubos_acima_100mm": [
+  "T1"
+ ],
+ "pavimentos": {
+  "TÉRREO": 10,
+  "1º PAVIMENTO": 2
+ }
+}
