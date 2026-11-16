@@ -538,6 +538,106 @@ const CLS_ORDER = ["P1","P2","P3","P4","INFO","FALSO"];
 const DISC=window.CoordixDisc;
 const GROUPS=DISC.GRUPOS_PADRAO;
 const CODE_INFO=DISC.SIGLAS_PADRAO;
+const DEFAULT_TESTS = [
+  [1,"EST","EST",0,"hard","Autodesk + BEP Penn State","Consistência estrutural"],
+  [2,"EST","ARQ",5,"hard","Penn State BEP","Compatibilidade geométrica"],
+  [3,"EST","SAN",5,"hard","Autodesk Practice","Perfurações críticas"],
+  [4,"EST","HVAC",5,"hard","NBIMS/Autodesk","Interferências críticas"],
+  [5,"EST","ELE",5,"hard","NBIMS/Autodesk","Passagens estruturais"],
+  [6,"EST","PCI",5,"hard","NBIMS","Sistema essencial"],
+  [7,"HVAC","HVAC",10,"hard","Autodesk","Coordenação interna"],
+  [8,"SAN","SAN",10,"hard","Autodesk","Coordenação interna"],
+  [9,"ELE","ELE",10,"hard","Autodesk","Coordenação interna"],
+  [10,"HVAC","SAN",10,"hard","Clash Matrix Practice","Congestionamento MEP"],
+  [11,"HVAC","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [12,"SAN","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [13,"PCI","HVAC",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [14,"PCI","SAN",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [15,"PCI","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
+  [16,"ARQ","HVAC",10,"hard","NBIMS + BEP","Forros e shafts"],
+  [17,"ARQ","SAN",10,"hard","NBIMS + BEP","Áreas molhadas"],
+  [18,"ARQ","ELE",10,"hard","NBIMS + BEP","Equipamentos e luminárias"],
+  [19,"FORRO","MEP",25,"clearance","Autodesk Clearance Clash","Espaço de instalação"],
+  [20,"EQUIP","MEP",30,"clearance","Autodesk Clearance Clash","Manutenção"],
+  [21,"EQUIP","ARQ",30,"clearance","Autodesk Clearance Clash","Operação"],
+  // Estrutura Metálica (MET): testes próprios, com as tolerâncias dos testes de Estrutura, editáveis em separado
+  [22,"MET","MET",0,"hard","Autodesk + BEP Penn State","Consistência estrutural (metálica)"],
+  [23,"MET","EST",0,"hard","Autodesk + BEP Penn State","Interface estrutura metálica × concreto"],
+  [24,"MET","ARQ",5,"hard","Penn State BEP","Compatibilidade geométrica"],
+  [25,"MET","SAN",5,"hard","Autodesk Practice","Perfurações críticas"],
+  [26,"MET","HVAC",5,"hard","NBIMS/Autodesk","Interferências críticas"],
+  [27,"MET","ELE",5,"hard","NBIMS/Autodesk","Passagens estruturais"],
+  [28,"MET","PCI",5,"hard","NBIMS","Sistema essencial"],
+].map(([ordem,a,b,tol,kind,fonte,just])=>({id:"t"+ordem,ordem,a,b,tol,kind,fonte,just,on:true}));
+
+const DEFAULT_ENTITY_NAMES = {
+  IFCPIPESEGMENT:"Segmento de tubulação", IFCPIPEFITTING:"Conexão de tubulação", IFCDUCTSEGMENT:"Segmento de duto", IFCDUCTFITTING:"Conexão de duto",
+  IFCCABLECARRIERSEGMENT:"Segmento de eletrocalha", IFCCABLECARRIERFITTING:"Conexão de eletrocalha", IFCCABLESEGMENT:"Segmento de cabo", IFCCABLEFITTING:"Conexão de cabo",
+  IFCFLOWSEGMENT:"Segmento de fluxo", IFCFLOWFITTING:"Conexão de fluxo", IFCFLOWTERMINAL:"Terminal de fluxo", IFCFLOWCONTROLLER:"Controlador de fluxo",
+  IFCVALVE:"Válvula/registro", IFCSANITARYTERMINAL:"Aparelho sanitário", IFCWASTETERMINAL:"Terminal de esgoto", IFCLIGHTFIXTURE:"Luminária", IFCOUTLET:"Tomada",
+  IFCSWITCHINGDEVICE:"Interruptor", IFCELECTRICDISTRIBUTIONBOARD:"Quadro de distribuição", IFCJUNCTIONBOX:"Caixa de passagem", IFCFIRESUPPRESSIONTERMINAL:"Terminal de combate a incêndio",
+  IFCALARM:"Alarme", IFCSENSOR:"Sensor", IFCTANK:"Reservatório", IFCPUMP:"Bomba", IFCAIRTERMINAL:"Terminal de ar", IFCUNITARYEQUIPMENT:"Equipamento unitário",
+  IFCWALL:"Parede", IFCWALLSTANDARDCASE:"Parede", IFCSLAB:"Laje", IFCBEAM:"Viga", IFCCOLUMN:"Pilar", IFCFOOTING:"Fundação", IFCPILE:"Estaca",
+  IFCSTAIR:"Escada", IFCSTAIRFLIGHT:"Lance de escada", IFCRAMP:"Rampa", IFCRAMPFLIGHT:"Lance de rampa", IFCROOF:"Cobertura", IFCDOOR:"Porta", IFCWINDOW:"Janela",
+  IFCCOVERING:"Revestimento/forro", IFCRAILING:"Guarda-corpo", IFCMEMBER:"Elemento linear", IFCPLATE:"Placa", IFCCURTAINWALL:"Fachada-cortina",
+  IFCBUILDINGELEMENTPROXY:"Elemento genérico", IFCFURNISHINGELEMENT:"Mobiliário", IFCFLOWSTORAGEDEVICE:"Reservatório", IFCFLOWMOVINGDEVICE:"Equipamento de recalque",
+  IFCENERGYCONVERSIONDEVICE:"Equipamento de conversão", IFCFLOWTREATMENTDEVICE:"Dispositivo de tratamento", IFCDISCRETEACCESSORY:"Acessório", IFCREINFORCINGBAR:"Armadura",
+  IFCDISTRIBUTIONCONTROLELEMENT:"Elemento de controle", IFCOPENINGELEMENT:"Abertura", IFCSPACE:"Ambiente",
+};
+const PRETTY_WORDS=/(controller|control|segment|fitting|terminal|device|element|carrier|fixture|board|box|equipment|standard|case|flight|proxy|suppression|distribution|conversion|storage|moving|treatment|unitary|sanitary|light|cable|pipe|duct|air|waste|curtain|building|reinforcing|bar|discrete|accessory|electric|switching|junction|fire|flow|energy|opening|wall|slab|beam|column|covering|railing|member|plate|stair|ramp|roof|door|window|footing|pile|space|annotation|virtual|outlet|valve|sensor|alarm|tank|pump|furnishing|transport|chiller|boiler|transformer|generator|heat|recovery|to|quantity|property|set)/g;
+const cap=w=>w.charAt(0).toUpperCase()+w.slice(1);
+const ifcPretty = c => c ? "Ifc" + cap(c.slice(3).toLowerCase().replace(PRETTY_WORDS,cap)) : "";
+
+const STRUCT_PRIMARY = new Set(["IFCBEAM","IFCCOLUMN","IFCFOOTING","IFCPILE","IFCMEMBER"]);
+const STRUCT_SLAB = new Set(["IFCSLAB","IFCROOF"]);
+const STRUCT_ALL = new Set([...STRUCT_PRIMARY,...STRUCT_SLAB,"IFCWALL","IFCWALLSTANDARDCASE"]);
+const EGRESS = new Set(["IFCSTAIR","IFCSTAIRFLIGHT","IFCRAMP","IFCRAMPFLIGHT"]);
+const FIRE = new Set(["IFCFIRESUPPRESSIONTERMINAL","IFCALARM"]);
+const LINEAR = new Set(["IFCPIPESEGMENT","IFCDUCTSEGMENT","IFCCABLECARRIERSEGMENT","IFCCABLESEGMENT","IFCFLOWSEGMENT"]);
+const FITTING = new Set(["IFCPIPEFITTING","IFCDUCTFITTING","IFCCABLECARRIERFITTING","IFCCABLEFITTING","IFCFLOWFITTING","IFCJUNCTIONBOX"]);
+const EMBEDDED = new Set(["IFCOUTLET","IFCSWITCHINGDEVICE","IFCFLOWTERMINAL","IFCSANITARYTERMINAL","IFCJUNCTIONBOX","IFCELECTRICDISTRIBUTIONBOARD","IFCVALVE","IFCDOOR","IFCWINDOW"]);
+const WALLS = new Set(["IFCWALL","IFCWALLSTANDARDCASE","IFCCURTAINWALL","IFCCOVERING","IFCPLATE"]);
+const EQUIP = new Set(["IFCUNITARYEQUIPMENT","IFCPUMP","IFCTANK","IFCELECTRICDISTRIBUTIONBOARD","IFCFLOWMOVINGDEVICE","IFCENERGYCONVERSIONDEVICE","IFCFLOWSTORAGEDEVICE","IFCCHILLER","IFCBOILER","IFCTRANSFORMER","IFCELECTRICGENERATOR","IFCAIRTOAIRHEATRECOVERY"]);
+const DEFAULT_EXCLUDED = ["IFCOPENINGELEMENT","IFCSPACE","IFCANNOTATION","IFCVIRTUALELEMENT"];
+
+/* Regras de pré-classificação: a primeira que se aplica define a sugestão */
+const RULES = [
+  {id:"r_fit", cls:"FALSO", cond:"Conexão × trecho do mesmo sistema (MEP)", reason:"Sobreposição de conexão com o próprio trecho — interferência de modelagem conhecida.",
+    test:(c,A,B)=>c.kind==="hard" && A.group===B.group && ((FITTING.has(A.cls)&&LINEAR.has(B.cls))||(FITTING.has(B.cls)&&LINEAR.has(A.cls))||(FITTING.has(A.cls)&&FITTING.has(B.cls))) && (!A.system||!B.system||A.system===B.system)},
+  {id:"r_node", cls:"FALSO", cond:"Encontro entre peças estruturais do mesmo modelo", reason:"Nó de pórtico (viga × viga, viga × pilar, laje × viga) no mesmo arquivo de estrutura.",
+    test:(c,A,B)=>A.model===B.model && isStruct(A) && STRUCT_ALL.has(A.cls) && STRUCT_ALL.has(B.cls)},
+  {id:"r_emb", cls:"FALSO", cond:"Dispositivo embutido em parede/vedação", reason:"Tomada, caixa, quadro ou terminal embutido na vedação, previsto em projeto.",
+    test:(c,A,B)=>(EMBEDDED.has(A.cls)&&WALLS.has(B.cls)&&B.group==="ARQ")||(EMBEDDED.has(B.cls)&&WALLS.has(A.cls)&&A.group==="ARQ")},
+  {id:"r_clear", cls:"INFO", cond:"Teste de folga (clearance) sem interferência física", reason:"Folga menor que a exigida, mas os elementos não se tocam.",
+    test:(c)=>c.kind==="clearance" && c.value>=0},
+  {id:"r_egress", cls:"P1", cond:"Escada/rampa × qualquer elemento", reason:"Interferência em rota de fuga.",
+    test:(c,A,B)=>EGRESS.has(A.cls)||EGRESS.has(B.cls)},
+  {id:"r_fire", cls:"P1", cond:"Terminal de incêndio × qualquer elemento", reason:"Equipamento obstruindo sistema de combate a incêndio.",
+    test:(c,A,B)=>FIRE.has(A.cls)||FIRE.has(B.cls)},
+  {id:"r_beam", cls:"P1", cond:"Viga/pilar × rede MEP com espessura de interferência > 50 mm", reason:"Tubulação ou duto atravessando viga/pilar (exemplo P1 do manual).",
+    test:(c,A,B)=>c.kind==="hard" && c.value>50 && ((STRUCT_PRIMARY.has(A.cls)&&isMep(B))||(STRUCT_PRIMARY.has(B.cls)&&isMep(A)))},
+  {id:"r_slab", cls:"P2", cond:"Laje × rede MEP", reason:"Passagem por laje sem furo/shaft previsto — exige redefinição.",
+    test:(c,A,B)=>(STRUCT_SLAB.has(A.cls)&&isMep(B))||(STRUCT_SLAB.has(B.cls)&&isMep(A))},
+  {id:"r_struct", cls:"P2", cond:"Viga/pilar × rede MEP com espessura de interferência ≤ 50 mm", reason:"Interferência com estrutura — verificar possibilidade de furo com a estrutura.",
+    test:(c,A,B)=>(STRUCT_PRIMARY.has(A.cls)&&isMep(B))||(STRUCT_PRIMARY.has(B.cls)&&isMep(A))},
+  {id:"r_main", cls:"P2", cond:"Redes principais de disciplinas diferentes", reason:"Conflito entre redes principais — afeta mais de uma disciplina.",
+    test:(c,A,B)=>LINEAR.has(A.cls)&&LINEAR.has(B.cls)&&A.code!==B.code&&mainSize(A)>60&&mainSize(B)>60},
+  {id:"r_arqest", cls:"P4", cond:"Arquitetura × estrutura", reason:"Vedação encostando na estrutura — erro de modelagem sem impacto construtivo.",
+    test:(c,A,B)=>(A.group==="ARQ"&&isStruct(B))||(isStruct(A)&&B.group==="ARQ")},
+  {id:"r_marg", cls:"P4", cond:"Espessura de interferência até 2× a tolerância", reason:"Interferência marginal, próxima da tolerância estabelecida.",
+    test:(c)=>c.kind==="hard" && c.value<=2*Math.max(c.tol,5)},
+  {id:"r_light", cls:"P3", cond:"Luminária × qualquer elemento", reason:"Reposicionamento de luminária.",
+    test:(c,A,B)=>A.cls==="IFCLIGHTFIXTURE"||B.cls==="IFCLIGHTFIXTURE"},
+  {id:"r_sec", cls:"P3", cond:"Tubulação secundária (≤ 60 mm)", reason:"Ajuste de tubulação secundária — correção pontual.",
+    test:(c,A,B)=>(LINEAR.has(A.cls)&&mainSize(A)<=60)||(LINEAR.has(B.cls)&&mainSize(B)<=60)},
+  {id:"r_wall", cls:"P3", cond:"Rede MEP × alvenaria", reason:"Passagem por alvenaria — furo pontual.",
+    test:(c,A,B)=>(isMep(A)&&WALLS.has(B.cls))||(isMep(B)&&WALLS.has(A.cls))},
+  {id:"r_def", cls:"P3", cond:"Demais casos", reason:"Impacto localizado e controlável.", test:()=>true},
+];
+function isMep(e){return ["SAN","HVAC","ELE","PCI"].includes(e.group)}
+function isStruct(e){return e.group==="EST"||e.group==="MET"} // estrutura de concreto ou metálica
+function mainSize(e){const s=[e.size[0],e.size[1],e.size[2]].sort((a,b)=>a-b);return s[1]}
+
 const FLEX_ORDER = ["EST","MET","ARQ","SAN","PSI","PCI","CLI","CON","HVAC","ELE","SUB","SPD","SCE"];
 
 /* ===================================================================== */
