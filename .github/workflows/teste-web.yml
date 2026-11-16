@@ -1,0 +1,30 @@
+name: Teste da versão web (branch temporária)
+on:
+  push:
+    branches: [teste/web-2.5]
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Testes do núcleo geométrico
+        run: node testes/geometria.test.js && node testes/comparativo_v1.js
+      - name: Testes dos módulos (com o leitor IFC real)
+        env:
+          COORDIX_EXIGIR_LEITOR: "1"
+        run: |
+          npm install --no-save --no-audit --no-fund web-ifc@0.0.78
+          node testes/disciplinas.test.js
+          node testes/dados.test.js
+      - name: Instalar Playwright (só no teste)
+        run: npm install --no-save --no-audit --no-fund playwright@1.49.1 && npx playwright install --with-deps chromium
+      - name: Teste de fumaça web
+        run: |
+          python3 -c "import http.server as h;H=h.SimpleHTTPRequestHandler;H.extensions_map.update({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8'});h.test(HandlerClass=H,port=8000,bind='127.0.0.1')" >/dev/null 2>&1 &  # utf-8 como no GitHub Pages
+          sleep 2
+          node teste-web/fumaca-web.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: teste-web, path: teste-web/*.png, if-no-files-found: ignore }
