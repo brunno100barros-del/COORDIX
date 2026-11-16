@@ -96,7 +96,7 @@ const PASSOS = {
       const q2 = await window.coordixDados.consultar({ filtros: [{ campo: 'classe', op: '=', valor: 'IFCWALL' }, { campo: 'pset:Pset_WallCommon.Reference', op: 'ausente' }] });
       const q3 = await window.coordixDados.consultar({});
       $('[data-nav=modelos]')?.click(); await sl(400);
-      const somaTabela = [...document.querySelectorAll('#main tbody tr')].map(tr => Number((tr.cells[2]?.innerText || '').replace(/\D/g, '')) || 0).reduce((a, b) => a + b, 0);
+      const somaTabela = [...document.querySelectorAll('#main tbody tr')].map(tr => Number((tr.cells[2]?.innerText || '').replace(/[^0-9]/g, '')) || 0).reduce((a, b) => a + b, 0);
       r.dados = { paredesComPset: q1 && q1.itens.length, paredesSemPset: q2 && q2.itens.length, consultados: q3 && q3.consultados, somaTabela, modelos: q3 && q3.modelos };
     } catch (e) { r.dados = { erro: String(e && e.message || e) }; }
     // Etapa 1 · disciplinas por projeto
@@ -122,7 +122,7 @@ const PASSOS = {
     const f = $('#testFiltro'); if (f) { f.value = 'MET'; f.dispatchEvent(new Event('change', { bubbles: true })); } await sl(500);
     const visiveis = linhas().length;
     document.querySelector('[data-selcmd="1"][data-selgrp="testes"]')?.click(); await sl(500);
-    r.selFiltroAviso = /oculto\(s\) pelo filtro/.test($('.selbar[data-selgrp="testes"]')?.innerText || '') ;
+    r.selFiltroAviso = /oculto.s. pelo filtro/.test($('.selbar[data-selgrp="testes"]')?.innerText || '') ;
     const f2 = $('#testFiltro'); if (f2) { f2.value = ''; f2.dispatchEvent(new Event('change', { bubbles: true })); } await sl(500);
     const depois = estado();
     r.selFiltro = visiveis > 0 && visiveis < original.length && depois.filter(x => x[1]).length === visiveis;
