@@ -128,7 +128,7 @@ const PASSOS = {
     r.selFiltro = visiveis > 0 && visiveis < original.length && depois.filter(x => x[1]).length === visiveis;
     r.selIndeterminado = !!document.querySelector('[data-selall="testes"]')?.indeterminate;
     // restaura exatamente o estado original de cada teste
-    for (const [id, on] of original) { const cb = document.querySelector(`tr[data-test="${id}"] [data-tf=on]`); if (cb && cb.checked !== on) { cb.checked = on; cb.dispatchEvent(new Event('change', { bubbles: true })); } }
+    for (const [id, on] of original) { const cb = document.querySelector('tr[data-test="' + id + '"] [data-tf=on]'); if (cb && cb.checked !== on) { cb.checked = on; cb.dispatchEvent(new Event('change', { bubbles: true })); } }
     await sl(400);
     r.selRestaurado = JSON.stringify(estado()) === JSON.stringify(original);
     $('#projMenuBtn')?.click(); await sl(200); $('[data-pact=salvar]')?.click();
