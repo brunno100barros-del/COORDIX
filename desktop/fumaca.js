@@ -90,6 +90,47 @@ const PASSOS = {
     r.painelProgresso = !!(await esperar(() => $('#progressPanel:not([hidden])') || [...document.querySelectorAll('.toast')].some(t => /clashes encontrados/.test(t.textContent)), 20000));
     r.analiseNovo = (await toastCom(/clashes encontrados/)) ? geo() : null;
     await sl(800);
+    // Etapa 1 · camada de dados: PropertySets lidos do leitor aberto, sem reimportar
+    try {
+      const q1 = await window.coordixDados.consultar({ filtros: [{ campo: 'classe', op: '=', valor: 'IFCWALL' }, { campo: 'pset:Pset_WallCommon.Reference', op: 'existe' }] });
+      const q2 = await window.coordixDados.consultar({ filtros: [{ campo: 'classe', op: '=', valor: 'IFCWALL' }, { campo: 'pset:Pset_WallCommon.Reference', op: 'ausente' }] });
+      const q3 = await window.coordixDados.consultar({});
+      $('[data-nav=modelos]')?.click(); await sl(400);
+      const somaTabela = [...document.querySelectorAll('#main tbody tr')].map(tr => Number((tr.cells[2]?.innerText || '').replace(/\D/g, '')) || 0).reduce((a, b) => a + b, 0);
+      r.dados = { paredesComPset: q1 && q1.itens.length, paredesSemPset: q2 && q2.itens.length, consultados: q3 && q3.consultados, somaTabela, modelos: q3 && q3.modelos };
+    } catch (e) { r.dados = { erro: String(e && e.message || e) }; }
+    // Etapa 1 · disciplinas por projeto
+    $('[data-nav=projeto]')?.click(); await sl(500);
+    const campo = (sel, v) => { const i = $(sel); if (i) { i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); } };
+    campo('#dSig', 'EST'); campo('#dNome', 'Estrutura duplicada'); $('#addDisc')?.click(); await sl(300);
+    r.discDuplicada = $('#discErr')?.textContent || '';
+    campo('#dSig', 'drn'); campo('#dNome', 'Drenagem'); $('#addDisc')?.click(); await sl(600);
+    r.discCadastrada = !!$('tr[data-disc-row="DRN"]');
+    $('[data-disc-toggle="SPD"]')?.click(); await sl(500);
+    r.spdInativa = /Inativa/.test($('tr[data-disc-row="SPD"]')?.innerText || '');
+    $('[data-disc-toggle="SPD"]')?.click(); await sl(500);
+    r.spdReativada = /Ativa/.test($('tr[data-disc-row="SPD"]')?.innerText || '') && !/Inativa/.test($('tr[data-disc-row="SPD"]')?.innerText || '');
+    $('[data-nav=regras]')?.click(); await sl(500);
+    r.discNaMatriz = [...document.querySelectorAll('#main tr[data-test] select')].some(s => [...s.options].some(o => o.textContent === 'Drenagem'));
+    // Etapa 1 · selecionar/desmarcar tudo: só o estado ativo muda; filtro respeitado; estado original restaurado
+    const linhas = () => [...document.querySelectorAll('#main tr[data-test]')];
+    const estado = () => linhas().map(tr => [tr.dataset.test, tr.querySelector('[data-tf=on]').checked, tr.querySelector('[data-tf=tol]').value, tr.querySelector('[data-tf=a]').value, tr.querySelector('[data-tf=b]').value]);
+    const original = estado();
+    document.querySelector('[data-selcmd="0"][data-selgrp="testes"]')?.click(); await sl(500);
+    const desm = estado();
+    r.selDesmarcar = desm.every(x => !x[1]) && desm.every((x, i) => x[2] === original[i][2] && x[3] === original[i][3] && x[4] === original[i][4]);
+    const f = $('#testFiltro'); if (f) { f.value = 'MET'; f.dispatchEvent(new Event('change', { bubbles: true })); } await sl(500);
+    const visiveis = linhas().length;
+    document.querySelector('[data-selcmd="1"][data-selgrp="testes"]')?.click(); await sl(500);
+    r.selFiltroAviso = /oculto\(s\) pelo filtro/.test($('.selbar[data-selgrp="testes"]')?.innerText || '') ;
+    const f2 = $('#testFiltro'); if (f2) { f2.value = ''; f2.dispatchEvent(new Event('change', { bubbles: true })); } await sl(500);
+    const depois = estado();
+    r.selFiltro = visiveis > 0 && visiveis < original.length && depois.filter(x => x[1]).length === visiveis;
+    r.selIndeterminado = !!document.querySelector('[data-selall="testes"]')?.indeterminate;
+    // restaura exatamente o estado original de cada teste
+    for (const [id, on] of original) { const cb = document.querySelector(`tr[data-test="${id}"] [data-tf=on]`); if (cb && cb.checked !== on) { cb.checked = on; cb.dispatchEvent(new Event('change', { bubbles: true })); } }
+    await sl(400);
+    r.selRestaurado = JSON.stringify(estado()) === JSON.stringify(original);
     $('#projMenuBtn')?.click(); await sl(200); $('[data-pact=salvar]')?.click();
     r.salvo = await toastCom(/Projeto salvo/);
     r.indicadorArquivo = $('#projFile')?.textContent || null;

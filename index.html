@@ -203,6 +203,8 @@ td input[type=text],td input[type=email],td input[type=number],td select{width:1
 td.tight{width:1%;white-space:nowrap}
 
 /* indicadores: classificação, status e revisão (marca lateral + tinta da cor) */
+.selbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 8px;font-size:12.5px}
+.selbar label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .chip{--c:var(--fake);display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px 0 9px;border-radius:var(--r-1);font:600 var(--fs-xs)/1 var(--font-mono);letter-spacing:.01em;white-space:nowrap;
   color:color-mix(in srgb,var(--c) 78%,var(--ink));background:color-mix(in srgb,var(--c) 12%,transparent);box-shadow:inset var(--bar) 0 0 var(--c)}
 .chip.P1{--c:var(--p1)} .chip.P2{--c:var(--p2)} .chip.P3{--c:var(--p3)} .chip.P4{--c:var(--p4)} .chip.INFO{--c:var(--info)} .chip.FALSO{--c:var(--fake)}
@@ -515,6 +517,8 @@ pre.xml{margin:0;padding:14px;background:var(--surface-2);border:var(--bw) solid
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="coordix-geometria.js"></script>
+<script src="coordix-disciplinas.js"></script>
+<script src="coordix-dados.js"></script>
 <script type="module">
 /* ===================================================================== */
 /*  Dados de referência (Manual Corporativo de Clash Detection + BCF)     */
@@ -529,112 +533,11 @@ const CLASSES = {
 };
 const CLS_ORDER = ["P1","P2","P3","P4","INFO","FALSO"];
 
-const GROUPS = {EST:"Estrutura",MET:"Estrutura Metálica",ARQ:"Arquitetura",SAN:"Hidrossanitário",HVAC:"HVAC",ELE:"Elétrica",PCI:"Incêndio",FORRO:"Forro",MEP:"MEP",EQUIP:"Equipamentos"};
-const CODE_INFO = { // código no nome do arquivo → disciplina
-  EST:["Estrutura","EST"], MET:["Estrutura Metálica","MET"], ARQ:["Arquitetura","ARQ"], SAN:["Hidrossanitário","SAN"], HID:["Hidráulica","SAN"],
-  PCI:["Prevenção e combate a incêndio","PCI"], PSI:["Piscina","SAN"], ELE:["Elétrica","ELE"], SCE:["Cabeamento estruturado","ELE"],
-  SPD:["SPDA","ELE"], SUB:["Subestação","ELE"], CLI:["Climatização","HVAC"], CON:["Climatização","HVAC"], HVAC:["HVAC","HVAC"],
-};
-const DEFAULT_TESTS = [
-  [1,"EST","EST",0,"hard","Autodesk + BEP Penn State","Consistência estrutural"],
-  [2,"EST","ARQ",5,"hard","Penn State BEP","Compatibilidade geométrica"],
-  [3,"EST","SAN",5,"hard","Autodesk Practice","Perfurações críticas"],
-  [4,"EST","HVAC",5,"hard","NBIMS/Autodesk","Interferências críticas"],
-  [5,"EST","ELE",5,"hard","NBIMS/Autodesk","Passagens estruturais"],
-  [6,"EST","PCI",5,"hard","NBIMS","Sistema essencial"],
-  [7,"HVAC","HVAC",10,"hard","Autodesk","Coordenação interna"],
-  [8,"SAN","SAN",10,"hard","Autodesk","Coordenação interna"],
-  [9,"ELE","ELE",10,"hard","Autodesk","Coordenação interna"],
-  [10,"HVAC","SAN",10,"hard","Clash Matrix Practice","Congestionamento MEP"],
-  [11,"HVAC","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
-  [12,"SAN","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
-  [13,"PCI","HVAC",10,"hard","Clash Matrix Practice","Coordenação MEP"],
-  [14,"PCI","SAN",10,"hard","Clash Matrix Practice","Coordenação MEP"],
-  [15,"PCI","ELE",10,"hard","Clash Matrix Practice","Coordenação MEP"],
-  [16,"ARQ","HVAC",10,"hard","NBIMS + BEP","Forros e shafts"],
-  [17,"ARQ","SAN",10,"hard","NBIMS + BEP","Áreas molhadas"],
-  [18,"ARQ","ELE",10,"hard","NBIMS + BEP","Equipamentos e luminárias"],
-  [19,"FORRO","MEP",25,"clearance","Autodesk Clearance Clash","Espaço de instalação"],
-  [20,"EQUIP","MEP",30,"clearance","Autodesk Clearance Clash","Manutenção"],
-  [21,"EQUIP","ARQ",30,"clearance","Autodesk Clearance Clash","Operação"],
-  // Estrutura Metálica (MET): testes próprios, com as tolerâncias dos testes de Estrutura, editáveis em separado
-  [22,"MET","MET",0,"hard","Autodesk + BEP Penn State","Consistência estrutural (metálica)"],
-  [23,"MET","EST",0,"hard","Autodesk + BEP Penn State","Interface estrutura metálica × concreto"],
-  [24,"MET","ARQ",5,"hard","Penn State BEP","Compatibilidade geométrica"],
-  [25,"MET","SAN",5,"hard","Autodesk Practice","Perfurações críticas"],
-  [26,"MET","HVAC",5,"hard","NBIMS/Autodesk","Interferências críticas"],
-  [27,"MET","ELE",5,"hard","NBIMS/Autodesk","Passagens estruturais"],
-  [28,"MET","PCI",5,"hard","NBIMS","Sistema essencial"],
-].map(([ordem,a,b,tol,kind,fonte,just])=>({id:"t"+ordem,ordem,a,b,tol,kind,fonte,just,on:true}));
-
-const DEFAULT_ENTITY_NAMES = {
-  IFCPIPESEGMENT:"Segmento de tubulação", IFCPIPEFITTING:"Conexão de tubulação", IFCDUCTSEGMENT:"Segmento de duto", IFCDUCTFITTING:"Conexão de duto",
-  IFCCABLECARRIERSEGMENT:"Segmento de eletrocalha", IFCCABLECARRIERFITTING:"Conexão de eletrocalha", IFCCABLESEGMENT:"Segmento de cabo", IFCCABLEFITTING:"Conexão de cabo",
-  IFCFLOWSEGMENT:"Segmento de fluxo", IFCFLOWFITTING:"Conexão de fluxo", IFCFLOWTERMINAL:"Terminal de fluxo", IFCFLOWCONTROLLER:"Controlador de fluxo",
-  IFCVALVE:"Válvula/registro", IFCSANITARYTERMINAL:"Aparelho sanitário", IFCWASTETERMINAL:"Terminal de esgoto", IFCLIGHTFIXTURE:"Luminária", IFCOUTLET:"Tomada",
-  IFCSWITCHINGDEVICE:"Interruptor", IFCELECTRICDISTRIBUTIONBOARD:"Quadro de distribuição", IFCJUNCTIONBOX:"Caixa de passagem", IFCFIRESUPPRESSIONTERMINAL:"Terminal de combate a incêndio",
-  IFCALARM:"Alarme", IFCSENSOR:"Sensor", IFCTANK:"Reservatório", IFCPUMP:"Bomba", IFCAIRTERMINAL:"Terminal de ar", IFCUNITARYEQUIPMENT:"Equipamento unitário",
-  IFCWALL:"Parede", IFCWALLSTANDARDCASE:"Parede", IFCSLAB:"Laje", IFCBEAM:"Viga", IFCCOLUMN:"Pilar", IFCFOOTING:"Fundação", IFCPILE:"Estaca",
-  IFCSTAIR:"Escada", IFCSTAIRFLIGHT:"Lance de escada", IFCRAMP:"Rampa", IFCRAMPFLIGHT:"Lance de rampa", IFCROOF:"Cobertura", IFCDOOR:"Porta", IFCWINDOW:"Janela",
-  IFCCOVERING:"Revestimento/forro", IFCRAILING:"Guarda-corpo", IFCMEMBER:"Elemento linear", IFCPLATE:"Placa", IFCCURTAINWALL:"Fachada-cortina",
-  IFCBUILDINGELEMENTPROXY:"Elemento genérico", IFCFURNISHINGELEMENT:"Mobiliário", IFCFLOWSTORAGEDEVICE:"Reservatório", IFCFLOWMOVINGDEVICE:"Equipamento de recalque",
-  IFCENERGYCONVERSIONDEVICE:"Equipamento de conversão", IFCFLOWTREATMENTDEVICE:"Dispositivo de tratamento", IFCDISCRETEACCESSORY:"Acessório", IFCREINFORCINGBAR:"Armadura",
-  IFCDISTRIBUTIONCONTROLELEMENT:"Elemento de controle", IFCOPENINGELEMENT:"Abertura", IFCSPACE:"Ambiente",
-};
-const PRETTY_WORDS=/(controller|control|segment|fitting|terminal|device|element|carrier|fixture|board|box|equipment|standard|case|flight|proxy|suppression|distribution|conversion|storage|moving|treatment|unitary|sanitary|light|cable|pipe|duct|air|waste|curtain|building|reinforcing|bar|discrete|accessory|electric|switching|junction|fire|flow|energy|opening|wall|slab|beam|column|covering|railing|member|plate|stair|ramp|roof|door|window|footing|pile|space|annotation|virtual|outlet|valve|sensor|alarm|tank|pump|furnishing|transport|chiller|boiler|transformer|generator|heat|recovery|to|quantity|property|set)/g;
-const cap=w=>w.charAt(0).toUpperCase()+w.slice(1);
-const ifcPretty = c => c ? "Ifc" + cap(c.slice(3).toLowerCase().replace(PRETTY_WORDS,cap)) : "";
-
-const STRUCT_PRIMARY = new Set(["IFCBEAM","IFCCOLUMN","IFCFOOTING","IFCPILE","IFCMEMBER"]);
-const STRUCT_SLAB = new Set(["IFCSLAB","IFCROOF"]);
-const STRUCT_ALL = new Set([...STRUCT_PRIMARY,...STRUCT_SLAB,"IFCWALL","IFCWALLSTANDARDCASE"]);
-const EGRESS = new Set(["IFCSTAIR","IFCSTAIRFLIGHT","IFCRAMP","IFCRAMPFLIGHT"]);
-const FIRE = new Set(["IFCFIRESUPPRESSIONTERMINAL","IFCALARM"]);
-const LINEAR = new Set(["IFCPIPESEGMENT","IFCDUCTSEGMENT","IFCCABLECARRIERSEGMENT","IFCCABLESEGMENT","IFCFLOWSEGMENT"]);
-const FITTING = new Set(["IFCPIPEFITTING","IFCDUCTFITTING","IFCCABLECARRIERFITTING","IFCCABLEFITTING","IFCFLOWFITTING","IFCJUNCTIONBOX"]);
-const EMBEDDED = new Set(["IFCOUTLET","IFCSWITCHINGDEVICE","IFCFLOWTERMINAL","IFCSANITARYTERMINAL","IFCJUNCTIONBOX","IFCELECTRICDISTRIBUTIONBOARD","IFCVALVE","IFCDOOR","IFCWINDOW"]);
-const WALLS = new Set(["IFCWALL","IFCWALLSTANDARDCASE","IFCCURTAINWALL","IFCCOVERING","IFCPLATE"]);
-const EQUIP = new Set(["IFCUNITARYEQUIPMENT","IFCPUMP","IFCTANK","IFCELECTRICDISTRIBUTIONBOARD","IFCFLOWMOVINGDEVICE","IFCENERGYCONVERSIONDEVICE","IFCFLOWSTORAGEDEVICE","IFCCHILLER","IFCBOILER","IFCTRANSFORMER","IFCELECTRICGENERATOR","IFCAIRTOAIRHEATRECOVERY"]);
-const DEFAULT_EXCLUDED = ["IFCOPENINGELEMENT","IFCSPACE","IFCANNOTATION","IFCVIRTUALELEMENT"];
-
-/* Regras de pré-classificação: a primeira que se aplica define a sugestão */
-const RULES = [
-  {id:"r_fit", cls:"FALSO", cond:"Conexão × trecho do mesmo sistema (MEP)", reason:"Sobreposição de conexão com o próprio trecho — interferência de modelagem conhecida.",
-    test:(c,A,B)=>c.kind==="hard" && A.group===B.group && ((FITTING.has(A.cls)&&LINEAR.has(B.cls))||(FITTING.has(B.cls)&&LINEAR.has(A.cls))||(FITTING.has(A.cls)&&FITTING.has(B.cls))) && (!A.system||!B.system||A.system===B.system)},
-  {id:"r_node", cls:"FALSO", cond:"Encontro entre peças estruturais do mesmo modelo", reason:"Nó de pórtico (viga × viga, viga × pilar, laje × viga) no mesmo arquivo de estrutura.",
-    test:(c,A,B)=>A.model===B.model && isStruct(A) && STRUCT_ALL.has(A.cls) && STRUCT_ALL.has(B.cls)},
-  {id:"r_emb", cls:"FALSO", cond:"Dispositivo embutido em parede/vedação", reason:"Tomada, caixa, quadro ou terminal embutido na vedação, previsto em projeto.",
-    test:(c,A,B)=>(EMBEDDED.has(A.cls)&&WALLS.has(B.cls)&&B.group==="ARQ")||(EMBEDDED.has(B.cls)&&WALLS.has(A.cls)&&A.group==="ARQ")},
-  {id:"r_clear", cls:"INFO", cond:"Teste de folga (clearance) sem interferência física", reason:"Folga menor que a exigida, mas os elementos não se tocam.",
-    test:(c)=>c.kind==="clearance" && c.value>=0},
-  {id:"r_egress", cls:"P1", cond:"Escada/rampa × qualquer elemento", reason:"Interferência em rota de fuga.",
-    test:(c,A,B)=>EGRESS.has(A.cls)||EGRESS.has(B.cls)},
-  {id:"r_fire", cls:"P1", cond:"Terminal de incêndio × qualquer elemento", reason:"Equipamento obstruindo sistema de combate a incêndio.",
-    test:(c,A,B)=>FIRE.has(A.cls)||FIRE.has(B.cls)},
-  {id:"r_beam", cls:"P1", cond:"Viga/pilar × rede MEP com espessura de interferência > 50 mm", reason:"Tubulação ou duto atravessando viga/pilar (exemplo P1 do manual).",
-    test:(c,A,B)=>c.kind==="hard" && c.value>50 && ((STRUCT_PRIMARY.has(A.cls)&&isMep(B))||(STRUCT_PRIMARY.has(B.cls)&&isMep(A)))},
-  {id:"r_slab", cls:"P2", cond:"Laje × rede MEP", reason:"Passagem por laje sem furo/shaft previsto — exige redefinição.",
-    test:(c,A,B)=>(STRUCT_SLAB.has(A.cls)&&isMep(B))||(STRUCT_SLAB.has(B.cls)&&isMep(A))},
-  {id:"r_struct", cls:"P2", cond:"Viga/pilar × rede MEP com espessura de interferência ≤ 50 mm", reason:"Interferência com estrutura — verificar possibilidade de furo com a estrutura.",
-    test:(c,A,B)=>(STRUCT_PRIMARY.has(A.cls)&&isMep(B))||(STRUCT_PRIMARY.has(B.cls)&&isMep(A))},
-  {id:"r_main", cls:"P2", cond:"Redes principais de disciplinas diferentes", reason:"Conflito entre redes principais — afeta mais de uma disciplina.",
-    test:(c,A,B)=>LINEAR.has(A.cls)&&LINEAR.has(B.cls)&&A.code!==B.code&&mainSize(A)>60&&mainSize(B)>60},
-  {id:"r_arqest", cls:"P4", cond:"Arquitetura × estrutura", reason:"Vedação encostando na estrutura — erro de modelagem sem impacto construtivo.",
-    test:(c,A,B)=>(A.group==="ARQ"&&isStruct(B))||(isStruct(A)&&B.group==="ARQ")},
-  {id:"r_marg", cls:"P4", cond:"Espessura de interferência até 2× a tolerância", reason:"Interferência marginal, próxima da tolerância estabelecida.",
-    test:(c)=>c.kind==="hard" && c.value<=2*Math.max(c.tol,5)},
-  {id:"r_light", cls:"P3", cond:"Luminária × qualquer elemento", reason:"Reposicionamento de luminária.",
-    test:(c,A,B)=>A.cls==="IFCLIGHTFIXTURE"||B.cls==="IFCLIGHTFIXTURE"},
-  {id:"r_sec", cls:"P3", cond:"Tubulação secundária (≤ 60 mm)", reason:"Ajuste de tubulação secundária — correção pontual.",
-    test:(c,A,B)=>(LINEAR.has(A.cls)&&mainSize(A)<=60)||(LINEAR.has(B.cls)&&mainSize(B)<=60)},
-  {id:"r_wall", cls:"P3", cond:"Rede MEP × alvenaria", reason:"Passagem por alvenaria — furo pontual.",
-    test:(c,A,B)=>(isMep(A)&&WALLS.has(B.cls))||(isMep(B)&&WALLS.has(A.cls))},
-  {id:"r_def", cls:"P3", cond:"Demais casos", reason:"Impacto localizado e controlável.", test:()=>true},
-];
-function isMep(e){return ["SAN","HVAC","ELE","PCI"].includes(e.group)}
-function isStruct(e){return e.group==="EST"||e.group==="MET"} // estrutura de concreto ou metálica
-function mainSize(e){const s=[e.size[0],e.size[1],e.size[2]].sort((a,b)=>a-b);return s[1]}
-
+/* Disciplinas: catálogo padrão (idêntico às antigas GROUPS/CODE_INFO) + cadastro por projeto em coordix-disciplinas.js.
+   GROUPS e CODE_INFO continuam como apelidos do catálogo padrão; a resolução por projeto usa DISC.* */
+const DISC=window.CoordixDisc;
+const GROUPS=DISC.GRUPOS_PADRAO;
+const CODE_INFO=DISC.SIGLAS_PADRAO;
 const FLEX_ORDER = ["EST","MET","ARQ","SAN","PSI","PCI","CLI","CON","HVAC","ELE","SUB","SPD","SCE"];
 
 /* ===================================================================== */
@@ -668,6 +571,7 @@ function defaultSettings(){
     rules:Object.fromEntries(RULES.map(r=>[r.id,{on:true,cls:r.cls}])),
     entityNames:{},
     flexOrder:[...FLEX_ORDER],
+    disciplinas:{extras:[],inativas:[]},
     decisions:{}, // chave par-de-GUIDs → decisão do coordenador
     issueSeq:0,
     created:new Date().toISOString(),
@@ -680,7 +584,8 @@ if(!DB.projects.find(p=>p.id==="exemplo")) DB.projects.unshift(exampleProject())
 for(const p of DB.projects){const d=defaultSettings();for(const k in d) if(p[k]===undefined) p[k]=d[k];
   // acréscimos de versões novas (nada existente é alterado): testes padrão ausentes e siglas novas na ordem de flexibilidade
   for(const t of DEFAULT_TESTS) if(!p.tests.some(x=>x.id===t.id)) p.tests.push({...t});
-  if(!p.flexOrder.includes("MET")){const i=p.flexOrder.indexOf("EST");p.flexOrder.splice(i<0?0:i+1,0,"MET")}}
+  if(!p.flexOrder.includes("MET")){const i=p.flexOrder.indexOf("EST");p.flexOrder.splice(i<0?0:i+1,0,"MET")}
+  DISC.migrar(p);}
 let saveT=0;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(STORE_KEY,JSON.stringify(DB))}catch(e){}if(typeof renderProjFile==="function") renderProjFile()},250)}
 const proj=()=>DB.projects.find(p=>p.id===DB.current)||DB.projects[0];
@@ -709,12 +614,10 @@ function decIfc(s){
           .replace(/\\S\\(.)/g,(m,c)=>String.fromCharCode(c.charCodeAt(0)+128))
           .replace(/\\\\/g,"\\");
 }
-function codeFromFile(name){
-  const up=name.toUpperCase().replace(/\.IFC$/,"");
-  const parts=up.split(/[-_ .]/);
-  for(const p of parts) if(CODE_INFO[p]) return p;
-  return "";
-}
+function codeFromFile(name,P){return DISC.siglaDoArquivo(P||proj(),name)}
+/* disciplina e grupo de um código no projeto (mesmo inativa: rótulos e histórico continuam legíveis) */
+function discInfo(P,code){const d=code?DISC.infoQualquer(P,code):null;return d?{disc:d.nome,group:d.grupo}:{disc:"A definir",group:null}}
+const groupLabel=(P,g)=>DISC.rotuloGrupo(P,g);
 function entityName(cls){const p=proj();return (p.entityNames&&p.entityNames[cls])||DEFAULT_ENTITY_NAMES[cls]||ifcPretty(cls)}
 function memberFor(code){
   if(!code) return null;
@@ -831,8 +734,9 @@ function projOffset(pid){const P=DB.projects.find(p=>p.id===pid);return P&&Array
 const median=a=>{if(!a.length) return 0;const s=Float64Array.from(a).sort();const h=s.length>>1;return s.length%2?s[h]:(s[h-1]+s[h])/2};
 async function loadIfc(projectId, file, bytes, origem){
   const list=S.models[projectId]||(S.models[projectId]=[]);
-  const code=codeFromFile(file);
-  const m={id:uid(),projectId,file,code,disc:(CODE_INFO[code]||["A definir"])[0],group:(CODE_INFO[code]||[null,null])[1],
+  const DP=DB.projects.find(p=>p.id===projectId)||proj();
+  const code=codeFromFile(file,DP);const di=discInfo(DP,code);
+  const m={id:uid(),projectId,file,code,disc:di.disc,group:di.group,
     status:"lendo",progress:0,elems:[],chunks:[],storeys:[],building:"",visible:true,error:null,size:bytes.byteLength,
     caminho:origem&&origem.caminho||null,sha256:origem&&origem.sha256||null};
   list.push(m);renderAll();
@@ -887,6 +791,10 @@ function indexModel(m){
     const tn=TYPE_NAME[gl.type]||"";if(!/SYSTEM/.test(tn)) return;
     for(const r of refs(l.RelatedObjects)) m.systemOf[val(r)]=decIfc(val(gl.Name))||"";
   });
+  m.stage="materiais e classificação";
+  m.materialOf={};m.classifOf={};
+  each(T.IFCRELASSOCIATESMATERIAL,"IfcRelAssociatesMaterial",l=>{const mt=val(l.RelatingMaterial);for(const r of refs(l.RelatedObjects)) m.materialOf[val(r)]=mt});
+  each(T.IFCRELASSOCIATESCLASSIFICATION,"IfcRelAssociatesClassification",l=>{const c=val(l.RelatingClassification);for(const r of refs(l.RelatedObjects)){const k=val(r);(m.classifOf[k]||(m.classifOf[k]=[])).push(c)}});
   m.stage="layers";
   each(T.IFCPRESENTATIONLAYERASSIGNMENT,"IfcPresentationLayerAssignment",l=>{const n=decIfc(val(l.Name));for(const r of refs(l.AssignedItems)) m.layerOfRep[val(r)]=n});
   m.stage="pavimentos";
@@ -918,6 +826,7 @@ function indexModel(m){
   for(const pid of ids(T.IFCPROJECT)){try{const pl=line(pid);const ua=val(pl.UnitsInContext);if(ua==null) continue;
     const al=line(ua);for(const u of al.Units||[]){const o=plainUnit(val(u));if(o) units.push(o)}}catch(e){skip("IfcUnitAssignment",e)}}
   m.lengthUnit=GEOC.resolveLengthUnit(units);
+  m.unitsRaw=units;m.unidadePlana=plainUnit; // área, volume e massa: usados pela camada de dados (quantidades)
   // referência independente para verificar se o leitor converteu a geometria: maior profundidade de extrusão
   m.maxExtrusionDepth=0;
   {let n=0;for(const id of ids(T.IFCEXTRUDEDAREASOLID)){if(++n>5000) break;try{const d=Number(val(line(id).Depth));if(d>m.maxExtrusionDepth) m.maxExtrusionDepth=d}catch(e){}}}
@@ -1179,6 +1088,63 @@ function psetsOf(el){
   if(t!=null){try{const tl=m.api.GetLine(m.mid,t,false);for(const r of tl.HasPropertySets||[]) read(val(r),true)}catch(e){}}
   el._psets=out;return out;
 }
+/* ===================================================================== */
+/*  Camada comum de dados (coordix-dados.js): índice por modelo, sob demanda */
+/* ===================================================================== */
+const DADOS=window.CoordixDados;
+const DX={ocupado:null}; // indexação em andamento (uma por vez)
+function fonteDe(m){return {linha:(id,flat)=>m.api.GetLine(m.mid,id,!!flat),nomeTipo:l=>TYPE_NAME[l&&l.type]||"",texto:x=>typeof x==="string"?decIfc(x):x,unidade:id=>m.unidadePlana?m.unidadePlana(id):null}}
+function ctxDe(m){
+  if(!m.dadosCtx) m.dadosCtx={fonte:fonteDe(m),psetsOf:m.psetsOf||{},typeOf:m.typeOf||{},materialOf:m.materialOf||{},classifOf:m.classifOf||{},unidades:DADOS.unidadesDoProjeto(m.unitsRaw),cache:DADOS.novoCache()};
+  return m.dadosCtx;
+}
+/* montagens (IfcRelAggregates entre elementos): pai → partes, para não somar os dois */
+function montagens(m){if(m.eidIdx) return;m.eidIdx=new Map(m.elems.map(i=>[ELEMS[i].eid,i]));m.temPartes=new Set();
+  for(const i of m.elems){const p=m.aggParent&&m.aggParent[ELEMS[i].eid];if(p!=null&&m.eidIdx.has(p)) m.temPartes.add(p)}}
+/* registro de dados de um elemento (lido uma vez e guardado no próprio elemento) */
+function regDe(el){
+  if(el._reg) return el._reg;
+  const m=el.m;montagens(m);let d;try{d=DADOS.dadosDoElemento(ctxDe(m),el.eid)}catch(e){d={conjuntos:[],materiais:[],materialOrigem:null,classificacoes:[],erro:String(e.message||e)}}
+  const pai=m.aggParent?m.aggParent[el.eid]:null;
+  el._reg=Object.assign({idx:el.idx,eid:el.eid,modelo:m.id,pai:pai!=null&&m.eidIdx&&m.eidIdx.has(pai)?pai:null,temPartes:!!(m.temPartes&&m.temPartes.has(el.eid))},d);
+  return el._reg;
+}
+/* campos básicos vêm dos elementos já carregados (nada é copiado) */
+function campoBasico(r,c){const el=ELEMS[r.idx],m=el.m;
+  switch(c){case "arquivo":case "modelo":return m.file;case "disciplina":return el.code||m.code||"";case "grupo":return el.group||"";case "classe":return el.cls;
+    case "entidade":return entityName(el.cls);case "pavimento":return el.storey;case "tipo":return el.typeName||el.objType||"";case "nome":return el.name;
+    case "sistema":return el.system;case "guid":return el.guid;case "tag":return el.tag;case "predefinido":return el.predef;default:return null}}
+/* índice do projeto: lê PropertySets, quantidades, materiais e classificação de todos os elementos dos modelos
+   prontos, em lotes (a interface não trava), com progresso real e cancelamento. Cada modelo é lido uma vez. */
+async function ensureDados(P,{titulo="Preparando os dados dos modelos"}={}){
+  const models=(S.models[P.id]||[]).filter(m=>m.status==="pronto"&&m.api);
+  const faltam=models.filter(m=>!m.dadosProntos);
+  if(faltam.length){
+    if(DX.ocupado){toast("Os dados dos modelos já estão sendo preparados.");return null}
+    const total=faltam.reduce((s,m)=>s+m.elems.length,0);let feito=0,cancel=false;
+    DX.ocupado={cancelar:()=>{cancel=true}};
+    progress.show({title:titulo,stage:"PropertySets, quantidades, materiais e classificação",onCancel:()=>{cancel=true}});
+    try{
+      for(const m of faltam){
+        progress.update({stage:`Lendo ${m.file}`,done:feito,total,unit:"elementos"});
+        const L=m.elems;let t0=performance.now();
+        for(let k=0;k<L.length;k++){
+          regDe(ELEMS[L[k]]);feito++;
+          if(performance.now()-t0>30){progress.update({stage:`Lendo ${m.file}`,done:feito,total,unit:"elementos"});await new Promise(r=>setTimeout(r,0));t0=performance.now();if(cancel) break}
+        }
+        if(cancel) break;
+        m.dadosProntos=true;
+      }
+    }finally{DX.ocupado=null;progress.hide()}
+    if(cancel){toast("Preparação dos dados cancelada. O que já foi lido fica guardado e não será lido de novo.");return null}
+  }
+  const registros=models.flatMap(m=>m.elems.map(i=>regDe(ELEMS[i])));
+  const semGeometria=models.reduce((s,m)=>s+(m.unprocessed||[]).length,0);
+  return {registros,modelos:models.map(m=>m.file),semGeometria};
+}
+function consultarDados(base,consulta){return DADOS.consultar(base.registros,consulta,campoBasico)}
+window.coordixDados={preparar:()=>ensureDados(proj()),consultar:async q=>{const b=await ensureDados(proj());if(!b) return null;const r=consultarDados(b,q);
+  return {consultados:r.consultados,modelos:r.modelos,itens:r.itens.map(x=>ELEMS[x.idx].guid),medida:r.medida&&{grandeza:r.medida.grandeza,unidade:r.medida.unidade,total:r.medida.total,comValor:r.medida.comValor.length,semValor:r.medida.semValor.length,semSI:r.medida.semSI.length,partesDeMontagem:r.medida.partesDeMontagem.length,conflitos:r.medida.conflitos.length,divergencias:r.medida.divergencias.length}}}};
 function fmtVal(v){
   if(v==null) return "";
   if(v==="T"||v===true) return "Sim"; if(v==="F"||v===false) return "Não";
@@ -1198,7 +1164,10 @@ function visusFields(el){
   ];
 }
 function extraFields(el){
-  return [["Nome",el.name],["Classe IFC",ifcPretty(el.cls)],["PredefinedType",el.predef],["Sistema",el.system],["Tag",el.tag],
+  const rg=regDe(el);
+  const mat=rg.materiais.length?rg.materiais.join(" / ")+(rg.materialOrigem==="tipo"?" (do tipo)":""):"";
+  const cla=rg.classificacoes.map(c=>[c.sistema,c.codigo,c.nome].filter(Boolean).join(" · ")).join(" / ");
+  return [["Nome",el.name],["Material",mat],["Classificação",cla],["Classe IFC",ifcPretty(el.cls)],["PredefinedType",el.predef],["Sistema",el.system],["Tag",el.tag],
     ["Dimensões (mm)",el.size.map(v=>fmt(v)).join(" × ")],
     ["Integridade geométrica",el.geoIntegrity==="parcial"?`parcial — ${(el.geoFailures||[]).length} representação(ões) não lida(s)`:el.geoIntegrity==="completa"?"completa":""],
     ["Topologia da malha",(el._solid||el._topo)?({solido_valido:"sólido válido",aberta:"malha aberta",invalida:"malha inválida",superficie:"superfície sem volume"}[el._solid?el._solid.topology:el._topo]||(el._solid?el._solid.topology:el._topo)):""]];
@@ -1328,7 +1297,7 @@ async function runAnalysis(){
         if(r.state==="abaixo_tolerancia"){below++;continue}
         // confirmado, inconclusivo e incompleto entram na lista: nunca são tratados como ausência de conflito
         const value=r.value==null?null:Math.round(r.value*1e4)/10;
-        const item={id:key,key:pairKey(a,b),a:a.idx,b:b.idx,test:t.id,testName:`${GROUPS[t.a]} × ${GROUPS[t.b]}`,kind:t.kind,tol:t.tol,value,center:r.center,
+        const item={id:key,key:pairKey(a,b),a:a.idx,b:b.idx,test:t.id,testName:`${groupLabel(P,t.a)} × ${groupLabel(P,t.b)}`,kind:t.kind,tol:t.tol,value,center:r.center,
           geo:{state:r.state,lb:r.lb,ub:r.ub,volume:r.volume,extent:r.extent,quality:r.quality,flags:r.flags,method:r.method,metricQuality:r.metricQuality,evidence:r.evidence,bounds:r.bounds}};
         // consolidação: o mesmo par em vários testes mantém o resultado mais relevante e confiável
         // (confirmado > inconclusivo/incompleto); um inconclusivo nunca é trocado por ausência
@@ -1530,7 +1499,7 @@ function renderAll(){
   // tira o visualizador antes de reescrever a área
   const viewer=$("#viewer");if(viewer.parentElement!==document.body){document.body.appendChild(viewer);viewer.hidden=true}
   const fn={projeto:viewProjeto,modelos:viewModelos,visualizador:viewVisualizador,regras:viewRegras,clashes:viewClashes,revisao:viewRevisao,issues:viewIssues,bcf:viewBcf}[v]||viewProjeto;
-  main.innerHTML=fn();
+  main.innerHTML=fn();marcarIndeterminados();
   if(v==="visualizador"){mountViewer($("#vslot"));if(V.pair){V.pair=null;clearHL();clearIsolation();$("#vlegend").hidden=true;setTimeout(()=>fitView(),30);setStatus("Clique em um elemento para ver as propriedades.")}renderTree();renderProps()}
   if(v==="revisao"){mountViewer($("#rslot"));renderQueue();renderReviewCard(true)}
 }
@@ -1581,13 +1550,51 @@ function viewProjeto(){
       </table></div>
       <p class="muted" style="font-size:12.5px;margin:10px 0 0">O responsável de cada clash é sugerido pelo código de disciplina do modelo que deve se adaptar (ordem de flexibilidade em Regras). </p>
     </div>
+    ${viewDisciplinas(P)}
   </section>`;
 }
+/* ---------- cadastro de disciplinas (por projeto) ---------- */
+function discEmUso(P,sigla){
+  return (S.models[P.id]||[]).some(m=>m.code===sigla)||(P.modelos||[]).some(r=>r.codigo===sigla)
+    ||P.tests.some(t=>t.a===sigla||t.b===sigla)||P.team.some(m=>(m.codes||"").toUpperCase().split(/[,; ]+/).includes(sigla));
+}
+function viewDisciplinas(P){
+  const L=DISC.lista(P),ativas=L.filter(d=>d.ativa).length,extras=L.filter(d=>!d.padrao);
+  const gruposPadrao=Object.entries(DISC.GRUPOS_PADRAO).filter(([g])=>!DISC.GRUPOS_DERIVADOS.has(g));
+  const outros=DB.projects.filter(o=>o.id!==P.id&&o.disciplinas&&(o.disciplinas.extras||[]).length);
+  const grupoSel=(d,dis)=>`<select data-dx="grupo" ${dis?"disabled":""} aria-label="Grupo de análise">
+      <option value="${esc(d.sigla)}" ${d.grupo===d.sigla?"selected":""}>Grupo próprio</option>
+      ${gruposPadrao.map(([g,r])=>`<option value="${g}" ${d.grupo===g?"selected":""}>Herda testes de ${esc(r)}</option>`).join("")}</select>`;
+  return `<div class="panel stack" id="discPanel">
+    <div class="row" style="justify-content:space-between"><h2>Disciplinas do projeto</h2><span class="muted num" style="font-size:12.5px">${ativas} ativas · ${extras.length} cadastradas neste projeto</span></div>
+    <p class="muted" style="font-size:12.5px;margin:0">A sigla é lida no nome do arquivo IFC (ex.: PROJ-<b>DRN</b>-R00.ifc). Cada disciplina tem um <b>grupo de análise</b>: o grupo próprio aparece na matriz de testes como uma disciplina nova (sem testes até você criá-los); "herda testes" faz a disciplina entrar nos testes do grupo escolhido. As disciplinas padrão não podem ser apagadas, só desativadas neste projeto. Desativar não apaga modelos, clashes, decisões nem histórico.</p>
+    <div class="tbl-wrap" style="max-height:420px;overflow:auto"><table>
+      <thead><tr><th>Sigla</th><th>Disciplina</th><th>Grupo de análise</th><th>Origem</th><th>Situação</th><th></th></tr></thead>
+      <tbody>${L.map(d=>{const uso=!d.padrao&&discEmUso(P,d.sigla);return `<tr data-disc-row="${esc(d.sigla)}">
+        <td class="mono tight">${d.padrao?esc(d.sigla):`<input type="text" data-dx="sigla" value="${esc(d.sigla)}" maxlength="6" style="width:84px" ${uso?'disabled title="Sigla em uso: só o nome pode ser alterado"':""} aria-label="Sigla">`}</td>
+        <td>${d.padrao?esc(d.nome):`<input type="text" data-dx="nome" value="${esc(d.nome)}" aria-label="Nome da disciplina">`}</td>
+        <td style="font-size:12.5px">${d.padrao?esc(groupLabel(P,d.grupo)):grupoSel(d,uso)}</td>
+        <td style="font-size:12.5px" class="muted">${d.padrao?"Padrão":"Deste projeto"}</td>
+        <td class="tight"><span class="chip ${d.ativa?"ok":"outline"}">${d.ativa?"Ativa":"Inativa"}</span></td>
+        <td class="tight"><button class="btn small ghost" data-disc-toggle="${esc(d.sigla)}">${d.ativa?"Desativar":"Reativar"}</button></td></tr>`}).join("")}</tbody>
+    </table></div>
+    <div class="row" style="gap:6px;align-items:flex-end;flex-wrap:wrap">
+      <label class="fld" style="width:110px">Sigla<input type="text" id="dSig" maxlength="6" placeholder="ex.: DRN" autocomplete="off"></label>
+      <label class="fld" style="flex:1 1 180px">Nome<input type="text" id="dNome" placeholder="ex.: Drenagem" autocomplete="off"></label>
+      <label class="fld" style="flex:1 1 200px">Grupo de análise<select id="dGrupo"><option value="">Grupo próprio</option>${gruposPadrao.map(([g,r])=>`<option value="${g}">Herda testes de ${esc(r)}</option>`).join("")}</select></label>
+      <button class="btn small primary" id="addDisc">+ Adicionar disciplina</button>
+    </div>
+    <div id="discErr" class="muted" role="alert" style="font-size:12.5px;color:var(--p1)"></div>
+    ${outros.length?`<div class="row" style="gap:6px"><span class="muted" style="font-size:12.5px">Copiar as disciplinas cadastradas em</span><select id="copyDiscFrom" style="width:auto">${outros.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join("")}</select><button class="btn small" id="copyDisc">Copiar</button></div>`:""}
+  </div>`;
+}
+/* depois de mudar o cadastro: modelos do projeto com sigla agora reconhecida/alterada recebem disciplina e grupo */
+function discRefresh(P){for(const m of S.models[P.id]||[]){const di=discInfo(P,m.code);if(m.disc!==di.disc||m.group!==di.group) setModelCode(P,m,m.code)}save();renderAll()}
 
 /* ---------- 2. Modelos ---------- */
 function viewModelos(){
   const P=proj();const ms=S.models[P.id]||[];
-  const discOpts=(cur)=>Object.entries(CODE_INFO).map(([k,v])=>`<option value="${k}" ${k===cur?"selected":""}>${k} — ${esc(v[0])}</option>`).join("")+`<option value="" ${!cur?"selected":""}>A definir</option>`;
+  const discOpts=(cur)=>DISC.lista(P).filter(d=>d.ativa||d.sigla===cur).map(d=>`<option value="${d.sigla}" ${d.sigla===cur?"selected":""}>${d.sigla} — ${esc(d.nome)}${d.ativa?"":" (inativa)"}</option>`).join("")+`<option value="" ${!cur?"selected":""}>A definir</option>`;
   return `<section class="view stack">
     <div><h1>Modelos IFC</h1><p class="lede">Envie um arquivo por disciplina. A disciplina é lida do código no nome do arquivo (ex.: PROJ-<b>SAN</b>-R00.ifc) e pode ser ajustada.</p></div>
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="Enviar arquivos IFC">
@@ -1598,6 +1605,7 @@ function viewModelos(){
     ${engineError?`<div class="alert"><div class="grow"><b>O motor IFC não carregou.</b> ${esc(engineError.message||engineError)}</div></div>`:""}
     <div class="panel">
       ${ms.length?`<div class="tbl-wrap"><table>
+        ${ms.filter(m=>m.status==="pronto").length>1?`<caption style="caption-side:top;text-align:left;padding:8px 10px 0">${selBar("modelos",P)}</caption>`:""}
         <thead><tr><th>Arquivo</th><th>Disciplina</th><th>Elementos</th><th>Pavimentos</th><th>Situação</th><th>Visível</th><th></th></tr></thead>
         <tbody>${ms.map(m=>`<tr data-model="${m.id}">
           <td><div style="font-weight:500">${esc(m.file)}</div><div class="muted mono">${fmt(m.size/1024)} kB${P.example?" · exemplo":""}</div></td>
@@ -1620,11 +1628,39 @@ function viewVisualizador(){
     <aside class="vside right"><div id="props"></div></aside>
   </div></section>`;
 }
+/* ---------- seleção múltipla: selecionar tudo / desmarcar tudo ----------
+   Age só sobre os itens VISÍVEIS (respeita o filtro da lista) e só sobre o estado ativo/visível:
+   tolerâncias, classes e parâmetros nunca mudam. Itens ocultos pelo filtro são informados. */
+const SEL={
+  testes:{rotulo:"testes",itens:P=>{const f=S.ui.testFiltro||"";return P.tests.filter(t=>!f||t.a===f||t.b===f)},total:P=>P.tests.length,on:x=>x.on,set:(x,v)=>{x.on=v}},
+  filtros:{rotulo:"filtros",itens:P=>P.filters,total:P=>P.filters.length,on:x=>x.on,set:(x,v)=>{x.on=v}},
+  regras:{rotulo:"regras",itens:P=>RULES.filter(r=>r.id!=="r_def").map(r=>{const c=P.rules[r.id]||(P.rules[r.id]={on:true,cls:r.cls});return c}),total:P=>RULES.length-1,on:x=>x.on!==false,set:(x,v)=>{x.on=v}},
+  modelos:{rotulo:"modelos visíveis",itens:P=>(S.models[P.id]||[]).filter(m=>m.status==="pronto"),total:P=>(S.models[P.id]||[]).filter(m=>m.status==="pronto").length,on:m=>m.visible,set:(m,v)=>{m.visible=v;for(const c of m.chunks) c.visible=v;V.dirty=true},sessao:true},
+};
+function selBar(grupo,P,{compacto=false}={}){
+  const g=SEL[grupo],it=g.itens(P),n=it.filter(g.on).length,ocultos=g.total(P)-it.length;
+  if(!it.length) return "";
+  const st=n===0?"":n===it.length?"checked":"";
+  return `<div class="selbar" data-selgrp="${grupo}"><label><input type="checkbox" data-selall="${grupo}" ${st} data-ind="${n>0&&n<it.length?1:0}" aria-label="Selecionar todos os ${g.rotulo}"><span class="num">${n} de ${it.length}</span></label>
+    <button class="btn small ghost" type="button" data-selcmd="1" data-selgrp="${grupo}">Selecionar tudo</button><button class="btn small ghost" type="button" data-selcmd="0" data-selgrp="${grupo}">Desmarcar tudo</button>
+    ${ocultos&&!compacto?`<span class="muted">${ocultos} oculto(s) pelo filtro não são alterados</span>`:""}</div>`;
+}
+function aplicarSel(grupo,v){
+  const P=proj(),g=SEL[grupo],it=g.itens(P);let mud=0;
+  for(const x of it) if(!!g.on(x)!==v){g.set(x,v);mud++}
+  const ocultos=g.total(P)-it.length;
+  if(!g.sessao) save();
+  renderAll();if(DB.view==="visualizador") renderTree();
+  toast(`${mud} ${g.rotulo} ${v?"selecionado(s)":"desmarcado(s)"}${ocultos?`; ${ocultos} oculto(s) pelo filtro não foram alterados`:""}.`);
+}
+/* atualiza só a barra de seleção do grupo (depois de marcar/desmarcar um item individual) */
+function refreshSel(grupo){const P=proj();for(const el of document.querySelectorAll(`.selbar[data-selgrp="${grupo}"]`)){const h=selBar(grupo,P,{compacto:!!el.closest("#tree")});if(h) el.outerHTML=h}marcarIndeterminados()}
+function marcarIndeterminados(){for(const c of document.querySelectorAll("[data-selall][data-ind='1']")) c.indeterminate=true}
 function renderTree(){
   const P=proj();const ms=(S.models[P.id]||[]).filter(m=>m.status==="pronto");const host=$("#tree");if(!host) return;
   if(!ms.length){host.innerHTML=`<div class="empty" style="margin:12px">Nenhum modelo carregado. <button class="btn small" data-nav="modelos" style="margin-top:8px">Enviar IFC</button></div>`;return}
   const open=S.ui.treeOpen;
-  host.innerHTML=`<ul class="tree">${ms.map(m=>{
+  host.innerHTML=(ms.length>1?`<div style="padding:8px 10px 0">${selBar("modelos",P,{compacto:true})}</div>`:"")+`<ul class="tree">${ms.map(m=>{
     const byStorey=new Map();for(const i of m.elems){const e=ELEMS[i];const s=byStorey.get(e.storey)||new Map();const k=e.cls;s.set(k,[...(s.get(k)||[]),i]);byStorey.set(e.storey,s)}
     const order=[...byStorey.keys()].sort((a,b)=>levelRank(a)-levelRank(b));
     const mk=m.id;const mo=open[mk]!==false;
@@ -1632,6 +1668,7 @@ function renderTree(){
       ${mo?`<ul>${order.map(st=>{const sk=mk+"|"+st;const so=open[sk]===true;const groups=byStorey.get(st);const all=[...groups.values()].flat();
         return `<li><div class="node" data-toggle="${esc(sk)}"><span class="caret">${so?"▾":"▸"}</span><span class="lbl">${esc(st)}</span><span class="ct">${all.length}</span><button class="btn small ghost" data-sel="${all.join(",")}" title="Selecionar pavimento" style="padding:0 4px">◎</button></div>
         ${so?`<ul>${[...groups.entries()].sort((a,b)=>entityName(a[0]).localeCompare(entityName(b[0]))).map(([cls,ids])=>`<li><div class="node" data-sel="${ids.join(",")}"><span class="caret"></span><span class="lbl" title="${esc(ifcPretty(cls))}">${esc(entityName(cls))}</span><span class="ct">${ids.length}</span></div></li>`).join("")}</ul>`:""}</li>`}).join("")}</ul>`:""}</li>`}).join("")}</ul>`;
+  marcarIndeterminados();
 }
 function propsTable(rows){return `<table class="props"><tbody>${rows.filter(r=>r[1]!=null&&r[1]!=="").map(([k,v,cls])=>`<tr${k==="Entidade"?' class="hl"':""}><td>${esc(k)}</td><td class="${cls||""}">${esc(v)}</td></tr>`).join("")}</tbody></table>`}
 function renderProps(){
@@ -1662,7 +1699,8 @@ function renderProps(){
 /* ---------- 4. Regras ---------- */
 function viewRegras(){
   const P=proj();
-  const groupOpts=(cur)=>Object.entries(GROUPS).map(([k,v])=>`<option value="${k}" ${k===cur?"selected":""}>${v}</option>`).join("");
+  const GA=DISC.grupos(P,true);
+  const groupOpts=(cur)=>Object.entries(GA).map(([k,v])=>`<option value="${k}" ${k===cur?"selected":""}>${esc(v)}</option>`).join("")+(cur&&!GA[cur]?`<option value="${esc(cur)}" selected>${esc(groupLabel(P,cur))} (inativa)</option>`:"");
   const loadedClasses=[...new Set((S.models[P.id]||[]).flatMap(m=>m.elems.map(i=>ELEMS[i].cls)))].sort((a,b)=>entityName(a).localeCompare(entityName(b)));
   const psetNames=[...new Set((S.models[P.id]||[]).flatMap(m=>m.elems.slice(0,4000).flatMap(i=>psetsOf(ELEMS[i]).map(p=>p.name))))].sort();
   return `<section class="view stack">
@@ -1670,9 +1708,12 @@ function viewRegras(){
 
     <div class="panel">
       <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2>Matriz de tolerância</h2><div class="row"><button class="btn small" id="addTest">+ Teste</button><button class="btn small primary" data-run>Executar análise</button></div></div>
+      <div class="row" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">${selBar("testes",P)}
+        <label class="row" style="gap:6px;font-size:12.5px;margin:0 0 8px"><span class="muted">Mostrar testes de</span><select id="testFiltro" style="width:auto">
+          <option value="">todas as disciplinas</option>${[...new Set(P.tests.flatMap(t=>[t.a,t.b]))].map(g=>`<option value="${esc(g)}" ${S.ui.testFiltro===g?"selected":""}>${esc(groupLabel(P,g))}</option>`).join("")}</select></label></div>
       <div class="tbl-wrap"><table>
         <thead><tr><th></th><th>Ordem</th><th>Disciplina A</th><th></th><th>Disciplina B</th><th>Tipo</th><th>Tolerância (mm)</th><th>Fonte</th><th>Justificativa</th></tr></thead>
-        <tbody>${P.tests.sort((a,b)=>a.ordem-b.ordem).map(t=>`<tr data-test="${t.id}">
+        <tbody>${P.tests.sort((a,b)=>a.ordem-b.ordem).filter(t=>!S.ui.testFiltro||t.a===S.ui.testFiltro||t.b===S.ui.testFiltro).map(t=>`<tr data-test="${t.id}">
           <td class="tight"><input type="checkbox" data-tf="on" ${t.on?"checked":""} aria-label="Ativo"></td>
           <td class="num tight">${t.ordem}</td>
           <td><select data-tf="a">${groupOpts(t.a)}</select></td><td class="muted tight">×</td>
@@ -1687,6 +1728,7 @@ function viewRegras(){
       <div class="panel stack">
         <div class="row" style="justify-content:space-between"><h2>Filtros de exclusão</h2><button class="btn small" id="addFilter">+ Filtro</button></div>
         <p class="muted" style="font-size:12.5px;margin:0">Elementos que atendem a um filtro ativo ficam fora da análise. Também dá para criar um filtro direto do painel de PropertySets no visualizador.</p>
+        ${P.filters.length>1?selBar("filtros",P):""}
         ${P.filters.length?P.filters.map(f=>`<div class="row" data-filter="${f.id}" style="gap:6px;padding:8px;border:1px solid var(--line);border-radius:6px">
           <input type="checkbox" data-ff="on" ${f.on?"checked":""} aria-label="Ativo">
           <select data-ff="kind" style="width:120px"><option value="prop" ${f.kind==="prop"?"selected":""}>PropertySet</option><option value="entity" ${f.kind==="entity"?"selected":""}>Entidade</option></select>
@@ -1710,6 +1752,7 @@ function viewRegras(){
 
     <div class="panel">
       <h2>Regras de pré-classificação</h2>
+      ${selBar("regras",P)}
       <p class="muted" style="font-size:12.5px;margin:0 0 10px">Avaliadas de cima para baixo; a primeira que se aplica define a sugestão. Baseadas nos critérios P1–P4 e INFO do manual e no padrão do seu BCF. Toda sugestão passa pela sua revisão.</p>
       <div class="tbl-wrap"><table><thead><tr><th></th><th>Condição</th><th>Sugere</th><th>Motivo exibido ao coordenador</th></tr></thead>
       <tbody>${RULES.map(r=>{const cfg=P.rules[r.id]||{on:true,cls:r.cls};return `<tr data-rule="${r.id}"><td class="tight"><input type="checkbox" data-rf="on" ${cfg.on?"checked":""} ${r.id==="r_def"?"disabled":""} aria-label="Ativa"></td>
@@ -2015,6 +2058,15 @@ document.addEventListener("click",e=>{
   const lk=t.closest("[data-link]");if(lk){linkedAction(lk.dataset.link,+lk.dataset.i);return}
   if(t.closest("#newProjectBtn")){toggleProjMenu(false);const p={id:uid(),name:"Novo projeto",desc:"",team:[{id:uid(),name:"",role:"Coordenador BIM",codes:"",email:"",coord:true}],...defaultSettings()};DB.projects.push(p);switchProject(p.id);go("projeto");setTimeout(()=>$("#pName")?.select(),30);return}
   if(t.closest("#delProject")){excluirProjeto();return}
+  const sc=t.closest("[data-selcmd]");if(sc){aplicarSel(sc.dataset.selgrp,sc.dataset.selcmd==="1");return}
+  if(t.closest("#addDisc")){const P=proj();const r=DISC.adicionar(P,{sigla:$("#dSig").value,nome:$("#dNome").value,grupo:$("#dGrupo").value||undefined});
+    if(!r.ok){$("#discErr").textContent=r.erros.join(" ");return}
+    // arquivos já carregados sem disciplina cuja sigla agora existe passam a ser reconhecidos
+    for(const m of S.models[P.id]||[]) if(!m.code&&codeFromFile(m.file,P)===r.disciplina.sigla){setModelCode(P,m,r.disciplina.sigla);const ref=(P.modelos||[]).find(x=>x.sha256===m.sha256&&x.arquivo===m.file);if(ref) ref.codigo=m.code}
+    toast(`Disciplina ${r.disciplina.sigla} — ${r.disciplina.nome} cadastrada neste projeto.`);discRefresh(P);return}
+  const dtg=t.closest("[data-disc-toggle]");if(dtg){const P=proj();const sg=dtg.dataset.discToggle;const d=DISC.infoQualquer(P,sg);DISC.definirAtiva(P,sg,!d.ativa);
+    toast(d.ativa?`${sg} desativada: não será mais detectada nem oferecida em itens novos; modelos e resultados existentes foram preservados.`:`${sg} reativada.`);discRefresh(P);return}
+  if(t.closest("#copyDisc")){const P=proj();const o=DB.projects.find(x=>x.id===$("#copyDiscFrom").value);const n=o?DISC.copiarDe(P,o):0;toast(n?`${n} disciplina(s) copiada(s).`:"Nenhuma disciplina nova para copiar (siglas já existentes são mantidas).");discRefresh(P);return}
   if(t.closest("#addMember")){proj().team.push({id:uid(),name:"",role:"",codes:"",email:""});save();renderAll();return}
   const dm=t.closest("[data-del-member]");if(dm){const P=proj();P.team=P.team.filter(m=>m.id!==dm.dataset.delMember);save();renderAll();return}
   if(t.closest("#drop")){$("#fileInput").click();return}
@@ -2051,12 +2103,18 @@ document.addEventListener("change",e=>{
   if(t.id==="projectSelect"){switchProject(t.value);return}
   if(t.id==="pName"){P.name=t.value.trim()||"Projeto sem nome";save();renderNav();return}
   if(t.id==="pDesc"){P.desc=t.value;save();return}
+  if(t.dataset.selall){aplicarSel(t.dataset.selall,t.checked);return}
+  if(t.id==="testFiltro"){S.ui.testFiltro=t.value;renderAll();return}
+  const dr=t.closest("tr[data-disc-row]");if(dr&&t.dataset.dx){const sg=dr.dataset.discRow;const r=DISC.editar(P,sg,{[t.dataset.dx]:t.value},discEmUso(P,sg));
+    if(!r.ok){toast(r.erros.join(" "));renderAll();return}
+    if(t.dataset.dx==="sigla"&&r.disciplina.sigla!==sg) for(const m of S.models[P.id]||[]) if(codeFromFile(m.file,P)===r.disciplina.sigla&&!m.code) setModelCode(P,m,r.disciplina.sigla);
+    discRefresh(P);return}
   const tr=t.closest("tr[data-mid]");if(tr){const m=P.team.find(x=>x.id===tr.dataset.mid);const f=t.dataset.f;if(f==="coord"){P.team.forEach(x=>x.coord=false);m.coord=true}else m[f]=t.value;save();reassignResp();return}
-  if(t.dataset.disc){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.disc);const code=t.value;m.code=code;{const r=(P.modelos||[]).find(x=>x.sha256===m.sha256&&x.arquivo===m.file);if(r) r.codigo=code}m.disc=(CODE_INFO[code]||["A definir"])[0];m.group=(CODE_INFO[code]||[null,null])[1];for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}toast("Disciplina atualizada. Execute a análise de novo para aplicar.");return}
-  if(t.dataset.vis){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.vis);m.visible=t.checked;for(const c of m.chunks) c.visible=m.visible;V.dirty=true;return}
-  const tt=t.closest("tr[data-test]");if(tt){const x=P.tests.find(y=>y.id===tt.dataset.test);const f=t.dataset.tf;x[f]=f==="on"?t.checked:f==="tol"?Math.max(0,+t.value||0):t.value;save();return}
-  const ff=t.closest("[data-filter]");if(ff){const x=P.filters.find(y=>y.id===ff.dataset.filter);const f=t.dataset.ff;x[f]=f==="on"?t.checked:t.value;if(f==="kind"&&x.kind==="entity"&&!x.cls) x.cls=Object.keys(DEFAULT_ENTITY_NAMES)[0];save();if(f==="kind"||f==="op") renderAll();return}
-  const rr=t.closest("tr[data-rule]");if(rr){const id=rr.dataset.rule;const cfg=P.rules[id]||(P.rules[id]={on:true,cls:RULES.find(r=>r.id===id).cls});if(t.dataset.rf==="on") cfg.on=t.checked; else cfg.cls=t.value;save();return}
+  if(t.dataset.disc){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.disc);const code=t.value;m.code=code;{const r=(P.modelos||[]).find(x=>x.sha256===m.sha256&&x.arquivo===m.file);if(r) r.codigo=code}{const di=discInfo(P,code);m.disc=di.disc;m.group=di.group}for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}toast("Disciplina atualizada. Execute a análise de novo para aplicar.");return}
+  if(t.dataset.vis){const m=(S.models[P.id]||[]).find(x=>x.id===t.dataset.vis);m.visible=t.checked;for(const c of m.chunks) c.visible=m.visible;V.dirty=true;for(const o of document.querySelectorAll(`[data-vis="${m.id}"]`)) o.checked=m.visible;refreshSel("modelos");return}
+  const tt=t.closest("tr[data-test]");if(tt){const x=P.tests.find(y=>y.id===tt.dataset.test);const f=t.dataset.tf;x[f]=f==="on"?t.checked:f==="tol"?Math.max(0,+t.value||0):t.value;save();if(f==="on") refreshSel("testes");return}
+  const ff=t.closest("[data-filter]");if(ff){const x=P.filters.find(y=>y.id===ff.dataset.filter);const f=t.dataset.ff;x[f]=f==="on"?t.checked:t.value;if(f==="kind"&&x.kind==="entity"&&!x.cls) x.cls=Object.keys(DEFAULT_ENTITY_NAMES)[0];save();if(f==="on") refreshSel("filtros");if(f==="kind"||f==="op") renderAll();return}
+  const rr=t.closest("tr[data-rule]");if(rr){const id=rr.dataset.rule;const cfg=P.rules[id]||(P.rules[id]={on:true,cls:RULES.find(r=>r.id===id).cls});if(t.dataset.rf==="on") cfg.on=t.checked; else cfg.cls=t.value;save();if(t.dataset.rf==="on") refreshSel("regras");return}
   if(t.dataset.ent){P.entityNames[t.dataset.ent]=t.value.trim();save();return}
   if(t.dataset.status){const c=currentClashes().find(x=>x.id===t.dataset.status);const old=c.status;c.status=t.value;logHist(c,`Status: ${old} → ${c.status}`);persistDecision(c);return}
   if(t.id==="bcfSel"){S.ui.bcfSel=t.value;renderAll();return}
@@ -2192,6 +2250,7 @@ function completeProject(p){ // mesmos acréscimos aplicados aos projetos salvos
   const d=defaultSettings();for(const k in d) if(p[k]===undefined) p[k]=d[k];
   for(const t of DEFAULT_TESTS) if(!p.tests.some(x=>x.id===t.id)) p.tests.push({...t});
   if(!p.flexOrder.includes("MET")){const i=p.flexOrder.indexOf("EST");p.flexOrder.splice(i<0?0:i+1,0,"MET")}
+  DISC.migrar(p);
   p.modelos=p.modelos||[];return p;
 }
 function confirmDialog({title,body,actions}){
@@ -2274,7 +2333,7 @@ async function carregarVinculados(P,refs){
   progress.hide();save();renderAll();
   if(n) await reanalisarComDecisoes(P);
 }
-function setModelCode(P,m,code){m.code=code;m.disc=(CODE_INFO[code]||["A definir"])[0];m.group=(CODE_INFO[code]||[null,null])[1];for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}}
+function setModelCode(P,m,code){m.code=code;{const di=discInfo(P,code);m.disc=di.disc;m.group=di.group}for(const i of m.elems){ELEMS[i].group=m.group;ELEMS[i].code=code}}
 async function reanalisarComDecisoes(P){
   if(DB.current!==P.id) return;
   await runAnalysis(); // as decisões salvas (por par de GUIDs) são reaplicadas pela própria análise

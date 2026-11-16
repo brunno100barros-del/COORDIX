@@ -32,6 +32,13 @@ jobs:
           node testes/comparativo_v1.js
           node testes/bvh.test.js
 
+      - name: Testes dos módulos (disciplinas e camada de dados, com o leitor IFC real)
+        env:
+          COORDIX_EXIGIR_LEITOR: "1"
+        run: |
+          node testes/disciplinas.test.js
+          node testes/dados.test.js
+
       - name: Comparação dos leitores IFC (web-ifc 0.0.39 × 0.0.78)
         run: node testes/comparar-leitores.js
 

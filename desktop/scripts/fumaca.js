@@ -68,6 +68,15 @@ if (a) {
   ok("desenho relativo ao centro: vértices pequenos (precisão Float32 preservada)", a.diag && a.diag.malhas > 0 && a.diag.maiorVertice < 200, a.diag);
   console.log("  análise do projeto novo (IFCs georreferenciados): " + a.analiseNovo);
   ok("um leitor IFC por modelo (memória isolada) e PropertySets disponíveis depois da leitura", a.diag && a.diag.modelos === 2 && a.diag.leitores === 2 && a.diag.psets.every((n) => n > 0), a.diag);
+  const dd = a.dados || {};
+  ok("camada de dados: PropertySets lidos do leitor aberto (4 paredes com Pset_WallCommon, 0 sem)", dd.paredesComPset === 4 && dd.paredesSemPset === 0, dd);
+  ok("camada de dados: consulta cobre todos os elementos dos modelos, sem reimportar", dd.consultados > 0 && dd.consultados === dd.somaTabela && (dd.modelos || []).length === 2, dd);
+  ok("disciplinas: sigla do catálogo padrão recusada", /catálogo padrão/.test(a.discDuplicada || ""), a.discDuplicada);
+  ok("disciplinas: DRN cadastrada no projeto e disponível na matriz de testes", a.discCadastrada && a.discNaMatriz, [a.discCadastrada, a.discNaMatriz]);
+  ok("disciplinas: desativar e reativar (SPD)", a.spdInativa && a.spdReativada, [a.spdInativa, a.spdReativada]);
+  ok("seleção: desmarcar tudo muda só o estado ativo (tolerâncias e disciplinas intactas)", a.selDesmarcar);
+  ok("seleção: com filtro, só os visíveis são marcados e os ocultos são informados", a.selFiltro && a.selFiltroAviso, [a.selFiltro, a.selFiltroAviso]);
+  ok("seleção: estado intermediário e restauração exata do original", a.selIndeterminado && a.selRestaurado, [a.selIndeterminado, a.selRestaurado]);
   ok("novo projeto com 2 IFCs e análise em segundo plano", a.novoModelos && a.painelProgresso && !!a.analiseNovo, [a.novoModelos, a.painelProgresso, a.analiseNovo]);
   ok("Salvar projeto (.coordix)", !!a.salvo && /Projeto Fumaça\.coordix/.test(a.indicadorArquivo || ""), [a.salvo, a.indicadorArquivo]);
   ok("Excluir projeto: confirmação com o nome e aviso de que nenhum arquivo é apagado", /Projeto Fumaça/.test(a.confirmacaoExclusao || "") && /não são apagados/.test(a.confirmacaoExclusao || "") && !!a.excluido && !a.projetosAposExcluir.some((n) => /Fumaça/.test(n)), [a.confirmacaoExclusao, a.projetosAposExcluir]);
@@ -77,6 +86,7 @@ let projetoArq = null;
 try { projetoArq = JSON.parse(fs.readFileSync(path.join(tmp, "Projeto Fumaça.coordix"), "utf8")); } catch {}
 ok("arquivo .coordix versionado, com referências (sem copiar os IFCs) e resultados", projetoArq && projetoArq.formato === "coordix-projeto" && projetoArq.versao === 1 && projetoArq.modelos.length === 2 && projetoArq.modelos.every((m) => /^[0-9a-f]{64}$/.test(m.sha256 || "") && m.caminho && m.caminhoRelativo) && Array.isArray(projetoArq.resultados.clashes) && fs.statSync(path.join(tmp, "Projeto Fumaça.coordix")).size < 2e6,
   projetoArq && { modelos: projetoArq.modelos, clashes: projetoArq.resultados && projetoArq.resultados.clashes.length });
+ok("disciplinas do projeto salvas no .coordix (DRN)", projetoArq && projetoArq.projeto && projetoArq.projeto.disciplinas && projetoArq.projeto.disciplinas.extras.some((d) => d.sigla === "DRN" && d.nome === "Drenagem"), projetoArq && projetoArq.projeto && projetoArq.projeto.disciplinas);
 ok("IFCs originais intactos depois de salvar, excluir e abrir o projeto", arquivos.every((p, i) => fs.existsSync(p) && hash(p) === hashesAntes[i]));
 ok("fase 1: sem erros no console", f1.r && f1.r.consoleErros.length === 0, f1.r && f1.r.consoleErros);
 ok("fase 1: nenhum recurso externo ou ausente", f1.r && f1.r.errosRede.length === 0, f1.r && f1.r.errosRede);
